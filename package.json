@@ -1,18 +1,20 @@
 {
-  "name": "ccs_backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "ccs-backend",
+  "version": "2.0.0",
+  "description": "Calcutta Canvas Space — Backend API",
+  "main": "src/config/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node src/config/server.js",
+    "dev": "nodemon src/config/server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "@simplewebauthn/server": "^13.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   }
 }
