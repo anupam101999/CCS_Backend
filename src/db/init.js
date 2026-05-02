@@ -21,44 +21,42 @@ async function initDB() {
     `);
     console.log("✅ users table ready");
 
-    // ── Sequence for ticket ID number part ──────────────────────────────────
+    // ── Sequence for Notification ID number part ──────────────────────────────────
     await client.query(`
-      CREATE SEQUENCE IF NOT EXISTS ticket_seq
+      CREATE SEQUENCE IF NOT EXISTS notification_seq
         START WITH 1
         INCREMENT BY 1
         NO MAXVALUE
         CACHE 1;
     `);
 
-    // ── Support tickets ──────────────────────────────────────────────────────
+    // ── Notification tickets ──────────────────────────────────────────────────────
     await client.query(`
-      CREATE TABLE IF NOT EXISTS support_tickets (
-        ticket_id   VARCHAR(14)   PRIMARY KEY
-                                  DEFAULT 'TCK' || LPAD(nextval('ticket_seq')::TEXT, 9, '0'),
-        user_id     INTEGER       NOT NULL
-                                  REFERENCES users(id) ON DELETE CASCADE,
-        category    VARCHAR(60)   NOT NULL,
-        subject     VARCHAR(120)  NOT NULL,
-        query       TEXT          NOT NULL,
-        status      VARCHAR(20)   NOT NULL DEFAULT 'open'
-                                  CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
-        created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
-      );
+     CREATE TABLE IF NOT EXISTS notification_tickets (
+        ticket_id VARCHAR(14) PRIMARY KEY 
+        DEFAULT LPAD(nextval('notification_seq')::TEXT, 9, '0'),
+        user_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+
+        category VARCHAR(60) NOT NULL,
+        subject  VARCHAR(120) NOT NULL,
+        query    TEXT NOT NULL,
+        reply    TEXT,
+        type     TEXT,
+
+        status VARCHAR(20) NOT NULL DEFAULT 'open',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
     `);
 
     // Index so lookups by user are fast
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id
-        ON support_tickets(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notification_tickets_user_id
+        ON notification_tickets(user_id);
     `);
 
-    console.log("✅ support_tickets table ready");
-    //fingerprint
-    await client.query(
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS passkeys JSONB DEFAULT '[]'::jsonb;`,
-    );
-    console.log("✅ Passkeys added to users table");
+    console.log("✅ notification_tickets table ready");
   } catch (err) {
     console.error("❌ DB init error:", err.message);
     process.exit(1);

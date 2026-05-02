@@ -3,9 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const initDB = require("../db/init");
 const introspect = require("../config/introspect");
-const userRoutes = require("../routes/users");
 const authRoutes = require("../routes/baseFunc");
-const fingerprintRoutes = require("../routes/fingerPrintRoute");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,8 +22,6 @@ app.get("/health", (_req, res) =>
 );
 
 app.use("/api", authRoutes);
-app.use("/api", fingerprintRoutes);
-app.use("/api/users", userRoutes);
 
 app.use((_req, res) => res.status(404).json({ message: "Route not found." }));
 

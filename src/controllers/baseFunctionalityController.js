@@ -210,14 +210,14 @@ const update = async (req, res) => {
 };
 const supportTicket = async (req, res) => {
   try {
-    const { userId, category, subject, query } = req.body;
+    const { userId, category, subject, query, type } = req.body;
 
     // ── Insert ticket ──────────────────────────
     const { rows } = await pool.query(
-      `INSERT INTO support_tickets (user_id, category, subject, query)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO notification_tickets (user_id, category, subject, query, type)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING ticket_id, user_id, category, subject, query, status, created_at`,
-      [userId, category.trim(), subject.trim(), query.trim()],
+      [userId, category.trim(), subject.trim(), query.trim(), type.trim()],
     );
 
     const ticket = rows[0];
@@ -225,16 +225,7 @@ const supportTicket = async (req, res) => {
     console.log(`🎫 Ticket created: ${ticket.ticket_id}`);
 
     return res.status(201).json({
-      message: "Support ticket created successfully.",
-      ticket: {
-        ticketId: ticket.ticket_id,
-        userId: ticket.user_id,
-        category: ticket.category,
-        subject: ticket.subject,
-        query: ticket.query,
-        status: ticket.status,
-        createdAt: ticket.created_at,
-      },
+      message: "Notification ticket created successfully.",
     });
   } catch (err) {
     console.error("supportTicket error:", err.message);
@@ -243,4 +234,24 @@ const supportTicket = async (req, res) => {
     });
   }
 };
-module.exports = { register, login, update, supportTicket };
+
+const getMyTickets = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const { rows } = await pool.query(
+      `SELECT * FROM notification_tickets WHERE user_id = $1`,
+      [userId],
+    );
+
+    return res.status(200).json({
+      tickets: rows,
+    });
+  } catch (err) {
+    console.error("getMyTickets error:", err.message);
+    return res.status(500).json({
+      message: "Internal server error.",
+    });
+  }
+};
+module.exports = { register, login, update, supportTicket, getMyTickets };
