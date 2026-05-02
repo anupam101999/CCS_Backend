@@ -1,7 +1,7 @@
 require("dotenv").config();
 const pool = require("../config/db");
 
-async function initDB() {
+async function dbCreateQuery() {
   const client = await pool.connect();
   try {
     console.log("🔧 Checking / creating tables...");
@@ -58,11 +58,11 @@ async function initDB() {
 
     console.log("✅ notification_tickets table ready");
   } catch (err) {
-    console.error("❌ DB init error:", err.message);
+    console.error("❌ db Create Query error:", err.message);
     process.exit(1);
   } finally {
     client.release();
   }
 }
 
-module.exports = initDB;
+module.exports = dbCreateQuery;
