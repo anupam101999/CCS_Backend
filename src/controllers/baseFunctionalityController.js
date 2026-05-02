@@ -152,8 +152,8 @@ const update = async (req, res) => {
          dob = $5,
          address = $6,
          password = $7
-     WHERE id = $1
-     RETURNING id, full_name, email, phone, dob, address`,
+         WHERE id = $1
+         RETURNING id, full_name, email, phone, dob, address`,
         [
           id,
           fullName.trim(),
@@ -172,8 +172,8 @@ const update = async (req, res) => {
          phone = $4,
          dob = $5,
          address = $6
-     WHERE id = $1
-     RETURNING id, full_name, email, phone, dob, address`,
+         WHERE id = $1
+         RETURNING id, full_name, email, phone, dob, address`,
         [
           id,
           fullName.trim(),
@@ -205,6 +205,12 @@ const update = async (req, res) => {
     });
   } catch (err) {
     console.error("update error:", err.message);
+
+    // ✅ Catch duplicate email specifically
+    if (err.code === "23505" && err.constraint === "users_email_key") {
+      return res.status(409).json({ message: "This email is already in use by another account." });
+    }
+
     return res.status(500).json({ message: "Internal server error." });
   }
 };
