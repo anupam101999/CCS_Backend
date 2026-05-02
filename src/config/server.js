@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const initDB = require("../db/init");
+const dbCreateQuery = require("../db/dbCreateQuery");
 const introspect = require("../config/introspect");
 const authRoutes = require("../routes/baseFunc");
 
@@ -27,6 +27,6 @@ app.use((_req, res) => res.status(404).json({ message: "Route not found." }));
 
 app.listen(PORT, async () => {
   console.log(`🚀 Server on port ${PORT}`);
-  await initDB();
+  await dbCreateQuery();
   await introspect();
 });
