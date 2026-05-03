@@ -246,7 +246,7 @@ const getMyTickets = async (req, res) => {
     const { userId } = req.params;
 
     const { rows } = await pool.query(
-      `SELECT * FROM notification_tickets WHERE user_id = $1`,
+      `SELECT * FROM notification_tickets WHERE user_id = $1 order by updatd_at desc`,
       [userId],
     );
 
