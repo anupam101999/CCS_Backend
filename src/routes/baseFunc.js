@@ -1,4 +1,4 @@
-const router = require("express").Router();
+const userRoute = require("express").Router();
 const {
   register,
   login,
@@ -17,32 +17,32 @@ const {
 const { requireSession } = require("../middleware/requireSession");
 
 // ── Public ─────────────────────────────────────────────────────────
-router.post("/register", register);
-router.post("/login", login);
-router.post("/signout", signOut);
-router.post("/validate-session", validateSession);
+userRoute.post("/register", register);
+userRoute.post("/login", login);
+userRoute.post("/signout", signOut);
+userRoute.post("/validate-session", validateSession);
 
 // ── Protected ──────────────────────────────────────────────────────
-router.put("/update", requireSession, update);
-router.post("/support/ticket", requireSession, supportTicket);
-router.get("/appointments/:userId", requireSession, listAppointments);
-router.post("/appointments", requireSession, bookAppointment);
-router.put(
+userRoute.put("/update", requireSession, update);
+userRoute.post("/support/ticket", requireSession, supportTicket);
+userRoute.get("/appointments/:userId", requireSession, listAppointments);
+userRoute.post("/appointments", requireSession, bookAppointment);
+userRoute.put(
   "/appointments/:bookingId/reschedule",
   requireSession,
   rescheduleAppointment,
 );
-router.get("/myNotifications/:userId", requireSession, getMyTickets);
-router.delete(
+userRoute.get("/myNotifications/:userId", requireSession, getMyTickets);
+userRoute.delete(
   "/myNotifications/:userId/:ticketId",
   requireSession,
   deleteNotification,
 );
-router.get(
+userRoute.get(
   "/myConfirmedAppointments/:userId",
   requireSession,
   confirmedAppointments,
 );
-router.delete("/myNotifications/:userId", requireSession, clearNotifications);
+userRoute.delete("/myNotifications/:userId", requireSession, clearNotifications);
 
-module.exports = router;
+module.exports = userRoute;

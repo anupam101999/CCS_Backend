@@ -126,7 +126,7 @@ const login = async (req, res) => {
         .json({ message: "Password must be at least 4 characters." });
 
     const { rows } = await pool.query(
-      `SELECT id, full_name, email, phone, dob, address, password,isAdmin
+      `SELECT id, full_name, email, phone, dob, address, password,isadmin
        FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email.trim()],
     );
@@ -180,7 +180,7 @@ const login = async (req, res) => {
             : user.dob
           : "",
         address: user.address || "",
-        isAdmin: user.isAdmin || false,
+        isadmin: user.isadmin || false,
       },
     });
   } catch (err) {
