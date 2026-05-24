@@ -16,7 +16,7 @@ async function dbCreateQuery() {
     phone VARCHAR(20),
     dob DATE,
     address TEXT,
-    isAdmin BOOLEAN NOT NULL DEFAULT FALSE,
+    isdmin BOOLEAN NOT NULL DEFAULT FALSE,
     password VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

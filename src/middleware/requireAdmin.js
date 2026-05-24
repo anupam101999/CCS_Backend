@@ -6,16 +6,16 @@ const requireAdmin = async (req, res, next) => {
     if (!token) return res.status(401).json({ message: "Unauthorized." });
 
     const { rows } = await pool.query(
-      `SELECT u.id, u.isadmin
+      `SELECT u.id, u.is_admin
        FROM user_sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.session_token = $1
          AND s.is_active = TRUE
        LIMIT 1`,
-      [token]
+      [token],
     );
 
-    if (!rows[0] || !rows[0].isadmin) {
+    if (!rows[0] || !rows[0].is_admin) {
       return res.status(403).json({ message: "Admin access required." });
     }
 

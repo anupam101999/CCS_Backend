@@ -126,7 +126,7 @@ const login = async (req, res) => {
         .json({ message: "Password must be at least 4 characters." });
 
     const { rows } = await pool.query(
-      `SELECT id, full_name, email, phone, dob, address, password,isadmin
+      `SELECT id, full_name, email, phone, dob, address, password,is_admin
        FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [email.trim()],
     );
@@ -173,14 +173,14 @@ const login = async (req, res) => {
         id: user.id,
         fullName: user.full_name,
         email: user.email,
-        phone: user.phone || "",  
+        phone: user.phone || "",
         dob: user.dob
           ? user.dob instanceof Date
             ? user.dob.toISOString().split("T")[0]
             : user.dob
           : "",
         address: user.address || "",
-        isadmin: user.isadmin || false,
+        is_admin: user.is_admin || false,
       },
     });
   } catch (err) {
@@ -584,9 +584,10 @@ const clearNotifications = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    await pool.query(`update notification_tickets SET notification_status = 'false' WHERE user_id = $1`, [
-      userId,
-    ]);
+    await pool.query(
+      `update notification_tickets SET notification_status = 'false' WHERE user_id = $1`,
+      [userId],
+    );
 
     return res.status(200).json({ message: "All notifications cleared." });
   } catch (err) {
