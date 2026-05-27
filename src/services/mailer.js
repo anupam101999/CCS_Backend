@@ -2,45 +2,19 @@ const nodemailer = require("nodemailer");
 
 let transporter;
 
-const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS || 10000);
-const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
-const SMTP_SECURE = String(process.env.SMTP_SECURE || "true").toLowerCase() === "true";
-const SMTP_FAMILY = Number(process.env.SMTP_FAMILY || 4);
-
 function getTransporter() {
   if (transporter) return transporter;
 
   if (!process.env.SMTP_USER || !process.env.SMTP_APP_PASSWORD) {
-    console.warn("[SMTP] Missing SMTP_USER or SMTP_APP_PASSWORD — mailer disabled.");
     return null;
   }
 
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    // requireTLS is only relevant for STARTTLS (port 587, secure=false)
-    // When secure=true (port 465), the connection is TLS-wrapped from the start
-    ...(SMTP_SECURE ? {} : { requireTLS: true }),
-    family: SMTP_FAMILY,
-    connectionTimeout: SMTP_TIMEOUT_MS,
-    greetingTimeout: SMTP_TIMEOUT_MS,
-    socketTimeout: SMTP_TIMEOUT_MS,
+    service: "gmail",
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_APP_PASSWORD.replace(/\s+/g, ""),
     },
-  });
-
-  // Verify connection at startup so failures show up clearly in Render logs
-  transporter.verify((error) => {
-    if (error) {
-      console.error("[SMTP] Connection failed:", error.message);
-      // Reset so the next request retries rather than reusing a broken transporter
-      transporter = null;
-    } else {
-      console.log("[SMTP] Server ready on port", SMTP_PORT);
-    }
   });
 
   return transporter;
@@ -53,24 +27,17 @@ function getFromAddress() {
 
 async function sendMail({ to, subject, text, html }) {
   const smtp = getTransporter();
-  if (!smtp) {
-    console.error("[SMTP] Transporter not available — email not sent.");
-    return false;
-  }
+  if (!smtp) return false;
 
-  try {
-    await smtp.sendMail({
-      from: getFromAddress(),
-      to,
-      subject,
-      text,
-      html,
-    });
-    return true;
-  } catch (err) {
-    console.error("[SMTP] sendMail failed:", err.message);
-    return false;
-  }
+  await smtp.sendMail({
+    from: getFromAddress(),
+    to,
+    subject,
+    text,
+    html,
+  });
+
+  return true;
 }
 
 async function sendRegistrationOtp({ to, code, expiresInMinutes }) {
