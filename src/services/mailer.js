@@ -2,6 +2,8 @@ const nodemailer = require("nodemailer");
 
 let transporter;
 
+const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS || 10000);
+
 function getTransporter() {
   if (transporter) return transporter;
 
@@ -11,6 +13,9 @@ function getTransporter() {
 
   transporter = nodemailer.createTransport({
     service: "gmail",
+    connectionTimeout: SMTP_TIMEOUT_MS,
+    greetingTimeout: SMTP_TIMEOUT_MS,
+    socketTimeout: SMTP_TIMEOUT_MS,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_APP_PASSWORD.replace(/\s+/g, ""),

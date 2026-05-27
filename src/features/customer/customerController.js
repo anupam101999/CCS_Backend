@@ -89,11 +89,19 @@ function getClientOrigin(req) {
 }
 
 async function deliverRegistrationVerificationCode(email, code) {
-  const sentBySmtp = await sendRegistrationOtp({
-    to: email,
-    code,
-    expiresInMinutes: REGISTRATION_VERIFICATION_CODE_MINUTES,
-  });
+  let sentBySmtp = false;
+  try {
+    sentBySmtp = await sendRegistrationOtp({
+      to: email,
+      code,
+      expiresInMinutes: REGISTRATION_VERIFICATION_CODE_MINUTES,
+    });
+  } catch (err) {
+    logger.warn("registration.smtp_delivery_failed", {
+      errorCode: err?.code,
+      errorMessage: err?.message,
+    });
+  }
   if (sentBySmtp) return true;
 
   if (!process.env.EMAIL_VERIFICATION_WEBHOOK_URL) return false;
@@ -122,11 +130,19 @@ async function deliverRegistrationVerificationCode(email, code) {
 }
 
 async function deliverEmailChangeVerificationCode(email, code) {
-  const sentBySmtp = await sendEmailChangeOtp({
-    to: email,
-    code,
-    expiresInMinutes: EMAIL_CHANGE_VERIFICATION_CODE_MINUTES,
-  });
+  let sentBySmtp = false;
+  try {
+    sentBySmtp = await sendEmailChangeOtp({
+      to: email,
+      code,
+      expiresInMinutes: EMAIL_CHANGE_VERIFICATION_CODE_MINUTES,
+    });
+  } catch (err) {
+    logger.warn("email_change.smtp_delivery_failed", {
+      errorCode: err?.code,
+      errorMessage: err?.message,
+    });
+  }
   if (sentBySmtp) return true;
 
   if (!process.env.EMAIL_VERIFICATION_WEBHOOK_URL) return false;
@@ -155,10 +171,18 @@ async function deliverEmailChangeVerificationCode(email, code) {
 }
 
 async function deliverPasswordResetLink(email, resetUrl) {
-  const sentBySmtp = await sendPasswordReset({
-    to: email,
-    resetUrl,
-  });
+  let sentBySmtp = false;
+  try {
+    sentBySmtp = await sendPasswordReset({
+      to: email,
+      resetUrl,
+    });
+  } catch (err) {
+    logger.warn("password_reset.smtp_delivery_failed", {
+      errorCode: err?.code,
+      errorMessage: err?.message,
+    });
+  }
   if (sentBySmtp) return true;
 
   if (!process.env.PASSWORD_RESET_WEBHOOK_URL) return false;
