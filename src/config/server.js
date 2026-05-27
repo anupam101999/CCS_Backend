@@ -8,6 +8,7 @@ const adminRoutes = require("../features/admin/adminRoutes");
 const uploadRoutes = require("../features/uploads/uploadRoutes");
 const projectRoutes = require("../features/projects/projectRoutes");
 const logger = require("../util/logger");
+const { requestLogger } = require("../middleware/requestLogger");
 
 
 const app = express();
@@ -37,6 +38,7 @@ app.use(
     ],
   }),
 );
+app.use("/api", requestLogger);
 app.use(express.json({ limit: "1mb" }));
 
 app.use("/api/admin", adminRoutes);
