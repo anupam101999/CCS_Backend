@@ -266,23 +266,12 @@ const register = async (req, res) => {
       req.body;
     const normalizedEmail = normalizeEmail(email);
 
-    // Validation
     if (!fullName || !email || !password || !dob || !address) {
       return res.status(400).json({ message: "All fields are required." });
     }
-    const normalizedDob = normalizeDateInput(dob);
-    if (!normalizedDob) {
-      return res.status(400).json({ message: "Enter DOB in DD/MM/YYYY format." });
-    }
-    if (!isGmail(normalizedEmail)) {
-      return res.status(400).json({ message: "Enter a valid Gmail address." });
-    }
-    if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters." });
-    }
-    // Duplicate check
+
+    const normalizedDob = String(dob).trim();
+
     const { rows: existing } = await pool.query(
       `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [normalizedEmail],
