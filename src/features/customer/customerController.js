@@ -25,6 +25,32 @@ function isGmail(email) {
   return GMAIL_RE.test(normalizeEmail(email));
 }
 
+function normalizeDateInput(value) {
+  const raw = String(value || "").trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const uiMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  const [, year, month, day] = isoMatch || [];
+  const [, uiDay, uiMonth, uiYear] = uiMatch || [];
+  const normalized = isoMatch
+    ? `${year}-${month}-${day}`
+    : uiMatch
+      ? `${uiYear}-${uiMonth}-${uiDay}`
+      : "";
+
+  if (!normalized) return null;
+
+  const parsed = new Date(`${normalized}T00:00:00.000Z`);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== normalized
+  ) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -220,6 +246,10 @@ const register = async (req, res) => {
     if (!fullName || !email || !password || !dob || !address) {
       return res.status(400).json({ message: "All fields are required." });
     }
+    const normalizedDob = normalizeDateInput(dob);
+    if (!normalizedDob) {
+      return res.status(400).json({ message: "Enter DOB in DD/MM/YYYY format." });
+    }
     if (!isGmail(normalizedEmail)) {
       return res.status(400).json({ message: "Enter a valid Gmail address." });
     }
@@ -259,7 +289,7 @@ const register = async (req, res) => {
         fullName.trim(),
         normalizedEmail,
         phone?.trim() || null,
-        dob || null,
+        normalizedDob,
         address || null,
         passwordHash,
         avatarurl || null,
@@ -803,6 +833,10 @@ const update = async (req, res) => {
     if (!fullName || !email || !dob || !address) {
       return res.status(400).json({ message: "All fields are required." });
     }
+    const normalizedDob = normalizeDateInput(dob);
+    if (!normalizedDob) {
+      return res.status(400).json({ message: "Enter DOB in DD/MM/YYYY format." });
+    }
     if (!isGmail(normalizedEmail)) {
       return res.status(400).json({ message: "Enter a valid Gmail address." });
     }
@@ -844,7 +878,7 @@ const update = async (req, res) => {
           fullName.trim(),
           currentEmail,
           phone?.trim() || null,
-          dob || null,
+          normalizedDob,
           address || null,
           passwordHash,
           avatarurl || null,
@@ -866,7 +900,7 @@ const update = async (req, res) => {
           fullName.trim(),
           currentEmail,
           phone?.trim() || null,
-          dob || null,
+          normalizedDob,
           address || null,
           avatarurl || null,
         ],
