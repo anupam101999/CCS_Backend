@@ -3,6 +3,9 @@ const nodemailer = require("nodemailer");
 let transporter;
 
 const SMTP_TIMEOUT_MS = Number(process.env.SMTP_TIMEOUT_MS || 10000);
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+const SMTP_FAMILY = Number(process.env.SMTP_FAMILY || 4);
 
 function getTransporter() {
   if (transporter) return transporter;
@@ -12,7 +15,11 @@ function getTransporter() {
   }
 
   transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    requireTLS: !SMTP_SECURE,
+    family: SMTP_FAMILY,
     connectionTimeout: SMTP_TIMEOUT_MS,
     greetingTimeout: SMTP_TIMEOUT_MS,
     socketTimeout: SMTP_TIMEOUT_MS,
