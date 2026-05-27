@@ -47,7 +47,7 @@ app.use("/api", uploadRoutes);
 app.use("/api", projectRoutes);
 
 app.get("/", (_req, res) =>
-  res.json({ status: "✅ online", app: "CCS Backend", version: "3.0.0" }),
+  res.json({ status: "✅ online", app: "CCS Backend", version: "3.1.0" }),
 );
 
 app.get("/health", (_req, res) =>

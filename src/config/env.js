@@ -1,9 +1,7 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-const envFile =
-  process.env.ENV_FILE ||
-  (process.env.NODE_ENV === "production" ? ".env.prod" : ".env.local");
+const envFile = process.env.ENV_FILE || ".env";
 
 dotenv.config({
   path: path.resolve(process.cwd(), envFile),
