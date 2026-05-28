@@ -244,6 +244,12 @@ function ensureOwnUser(req, res, userId) {
 
   const authedUserId = getAuthedUserId(req);
   if (!authedUserId || String(authedUserId) !== String(userId)) {
+    logger.warn("auth.ownership_denied", {
+      authedUserId,
+      requestedUserId: userId,
+      method: req.method,
+      path: req.originalUrl,
+    });
     res.status(403).json({ message: "Forbidden." });
     return false;
   }
@@ -294,6 +300,7 @@ const register = async (req, res) => {
     const normalizedEmail = normalizeEmail(email);
 
     if (!fullName || !email || !password || !dob || !address) {
+      logger.warn("registration.rejected", { reason: "missing_required_fields", email: normalizedEmail });
       return res.status(400).json({ message: "All fields are required." });
     }
 
@@ -304,6 +311,7 @@ const register = async (req, res) => {
       [normalizedEmail],
     );
     if (existing.length > 0) {
+      logger.warn("registration.rejected", { reason: "email_exists", email: normalizedEmail });
       return res
         .status(409)
         .json({ message: "An account with this email already exists." });
@@ -340,13 +348,14 @@ const register = async (req, res) => {
 
     const delivered = await deliverRegistrationVerificationCode(normalizedEmail, code);
     if (!delivered && process.env.EMAIL_VERIFICATION_DEV_CODE !== "true") {
-      logger.warn("registration.verification_not_configured");
+      logger.warn("registration.verification_not_configured", { email: normalizedEmail });
       return res.status(503).json({
         message: "Email verification is not configured yet.",
       });
     }
 
     logger.info("registration.verification_requested", {
+      email: normalizedEmail,
       delivered,
       devCodeReturned: process.env.EMAIL_VERIFICATION_DEV_CODE === "true",
     });
@@ -369,6 +378,7 @@ const verifyRegistrationEmail = async (req, res) => {
     const { verificationId, code } = req.body;
 
     if (!verificationId || !code) {
+      logger.warn("registration.verification_rejected", { reason: "missing_code" });
       return res.status(400).json({ message: "Verification code is required." });
     }
 
@@ -398,6 +408,7 @@ const verifyRegistrationEmail = async (req, res) => {
 
     if (existing.length > 0) {
       await client.query("ROLLBACK");
+      logger.warn("registration.verification_rejected", { reason: "email_exists", email: pending.email });
       return res
         .status(409)
         .json({ message: "An account with this email already exists." });
@@ -425,7 +436,7 @@ const verifyRegistrationEmail = async (req, res) => {
     const sessionToken = await createUserSession(client, req, inserted[0]);
     await client.query("COMMIT");
 
-    logger.info("user.registered", { userId: inserted[0].id });
+    logger.info("user.registered", { userId: inserted[0].id, email: inserted[0].email });
     return res.status(201).json({
       message: "Email verified. Account created successfully.",
       token: sessionToken,
@@ -447,16 +458,22 @@ const login = async (req, res) => {
     const normalizedEmail = normalizeEmail(email);
 
     //login user validate
-    if (!email || !password)
+    if (!email || !password) {
+      logger.warn("auth.login_rejected", { reason: "missing_credentials" });
       return res
         .status(400)
         .json({ message: "Email and password are required." });
-    if (!isGmail(normalizedEmail))
+    }
+    if (!isGmail(normalizedEmail)) {
+      logger.warn("auth.login_rejected", { reason: "invalid_email", email: normalizedEmail });
       return res.status(400).json({ message: "Enter a valid Gmail address." });
-    if (password.length < 6)
+    }
+    if (password.length < 6) {
+      logger.warn("auth.login_rejected", { reason: "short_password", email: normalizedEmail });
       return res
         .status(400)
         .json({ message: "Password must be at least 6 characters." });
+    }
 
     const { rows } = await pool.query(
       `SELECT id, full_name, email, phone, dob, address, password,is_admin,avatarurl
@@ -514,6 +531,7 @@ const requestPasswordReset = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
 
     if (!isGmail(email)) {
+      logger.warn("password_reset.rejected", { reason: "invalid_email", email });
       return res.status(400).json({ message: "Enter a valid Gmail address." });
     }
 
@@ -569,10 +587,12 @@ const resetPassword = async (req, res) => {
     const { token, password } = req.body;
 
     if (!token || typeof token !== "string") {
+      logger.warn("password_reset.rejected", { reason: "missing_token" });
       return res.status(400).json({ message: "Reset token is required." });
     }
 
     if (!password || password.length < 6) {
+      logger.warn("password_reset.rejected", { reason: "short_password" });
       return res
         .status(400)
         .json({ message: "Password must be at least 6 characters." });
@@ -625,7 +645,10 @@ const resetPassword = async (req, res) => {
 const signOut = async (req, res) => {
   try {
     const token = req.sessionToken || req.body?.token;
-    if (!token) return res.status(400).json({ message: "Token required." });
+    if (!token) {
+      logger.warn("auth.signout_rejected", { reason: "missing_token", userId: req.user?.id });
+      return res.status(400).json({ message: "Token required." });
+    }
 
     await pool.query(
       `UPDATE user_sessions
@@ -634,6 +657,7 @@ const signOut = async (req, res) => {
       [token],
     );
 
+    logger.info("auth.signout_success", { userId: req.user?.id, sessionId: req.sessionId });
     return res.json({ message: "Signed out successfully." });
   } catch (err) {
     logger.error("auth.signout_failed", err, { userId: req.user?.id });
@@ -658,6 +682,8 @@ const tokenRefresh = async (req, res) => {
       [newToken, req.sessionId],
     );
 
+    logger.info("auth.token_refreshed", { userId: req.user?.id, sessionId: req.sessionId });
+
     return res.json({
       valid: true,
       token: newToken,
@@ -678,6 +704,7 @@ const requestEmailChange = async (req, res) => {
     const newEmail = normalizeEmail(req.body?.email);
 
     if (!isGmail(newEmail)) {
+      logger.warn("email_change.request_rejected", { userId, reason: "invalid_email", email: newEmail });
       return res.status(400).json({ message: "Enter a valid Gmail address." });
     }
 
@@ -688,10 +715,12 @@ const requestEmailChange = async (req, res) => {
     const currentEmail = normalizeEmail(currentRows[0]?.email);
 
     if (!currentEmail) {
+      logger.warn("email_change.request_rejected", { userId, reason: "user_not_found" });
       return res.status(404).json({ message: "User not found." });
     }
 
     if (newEmail === currentEmail) {
+      logger.warn("email_change.request_rejected", { userId, reason: "same_email" });
       return res.status(400).json({ message: "Please provide a unique Gmail address." });
     }
 
@@ -701,6 +730,7 @@ const requestEmailChange = async (req, res) => {
     );
 
     if (existingRows.length > 0) {
+      logger.warn("email_change.request_rejected", { userId, reason: "email_exists", email: newEmail });
       return res
         .status(409)
         .json({ message: "An account with this email already exists." });
@@ -762,6 +792,7 @@ const verifyEmailChange = async (req, res) => {
     const { verificationId, code } = req.body;
 
     if (!verificationId || !code) {
+      logger.warn("email_change.verify_rejected", { userId, reason: "missing_code" });
       return res.status(400).json({ message: "Verification code is required." });
     }
 
@@ -799,6 +830,7 @@ const verifyEmailChange = async (req, res) => {
 
     if (existingRows.length > 0) {
       await client.query("ROLLBACK");
+      logger.warn("email_change.verify_rejected", { userId, reason: "email_exists", email: pending.new_email });
       return res
         .status(409)
         .json({ message: "An account with this email already exists." });
@@ -839,23 +871,27 @@ const verifyEmailChange = async (req, res) => {
 
 // ── Update ─────────────────────────────────────────────────────
 const update = async (req, res) => {
+  let id;
   try {
     const { id: requestedId, fullName, email, phone, dob, address, password, avatarurl } =
       req.body;
-    const id = getAuthedUserId(req);
+    id = getAuthedUserId(req);
     const normalizedEmail = normalizeEmail(email);
 
     if (!ensureOwnUser(req, res, requestedId || id)) return;
 
     // Validation
     if (!fullName || !email || !dob || !address) {
+      logger.warn("user.update_rejected", { userId: id, reason: "missing_required_fields" });
       return res.status(400).json({ message: "All fields are required." });
     }
     const normalizedDob = normalizeDateInput(dob);
     if (!normalizedDob) {
+      logger.warn("user.update_rejected", { userId: id, reason: "invalid_dob" });
       return res.status(400).json({ message: "Enter DOB in DD/MM/YYYY format." });
     }
     if (!isGmail(normalizedEmail)) {
+      logger.warn("user.update_rejected", { userId: id, reason: "invalid_email", email: normalizedEmail });
       return res.status(400).json({ message: "Enter a valid Gmail address." });
     }
 
@@ -866,6 +902,7 @@ const update = async (req, res) => {
     const currentEmail = normalizeEmail(currentRows[0]?.email);
 
     if (!currentEmail) {
+      logger.warn("user.update_rejected", { userId: id, reason: "user_not_found" });
       return res.status(404).json({ message: "User not found." });
     }
 
@@ -926,7 +963,7 @@ const update = async (req, res) => {
     }
 
     const user = rows[0];
-    logger.info("user.updated", { userId: user.id });
+    logger.info("user.updated", { userId: user.id, changedPassword: password != null, changedAvatar: Boolean(avatarurl) });
 
     return res.status(201).json({
       message: "Updated user successfully.",
@@ -949,6 +986,7 @@ const update = async (req, res) => {
 
     // ✅ Catch duplicate email specifically
     if (err.code === "23505" && err.constraint === "users_email_key") {
+      logger.warn("user.update_rejected", { userId: id, reason: "duplicate_email" });
       return res
         .status(409)
         .json({ message: "This email is already in use by another account." });
@@ -963,6 +1001,7 @@ const supportTicket = async (req, res) => {
     const userId = getAuthedUserId(req);
 
     if (!category?.trim() || !subject?.trim() || !query?.trim() || !type?.trim()) {
+      logger.warn("ticket.create_rejected", { userId, reason: "missing_required_fields" });
       return res.status(400).json({ message: "Ticket details are required." });
     }
 
@@ -1002,6 +1041,8 @@ const confirmedAppointments = async (req, res) => {
       [userId],
     );
 
+    logger.info("appointments.confirmed_listed", { userId, resultCount: rows.length });
+
     return res.status(200).json({
       appointments: rows.map(mapAppointment),
     });
@@ -1023,6 +1064,8 @@ const listAppointments = async (req, res) => {
        ORDER BY appointment_date ASC NULLS LAST, appointment_time ASC NULLS LAST, created_at DESC`,
       [userId],
     );
+
+    logger.info("appointments.listed", { userId, resultCount: rows.length });
 
     return res.status(200).json({
       appointments: rows.map(mapAppointment),
@@ -1054,6 +1097,7 @@ const bookAppointment = async (req, res) => {
       !preferredDate ||
       !preferredTime
     ) {
+      logger.warn("appointments.book_rejected", { userId, reason: "missing_required_fields" });
       return res
         .status(400)
         .json({ message: "Appointment details are required." });
@@ -1093,6 +1137,14 @@ const bookAppointment = async (req, res) => {
 
     await client.query("COMMIT");
 
+    logger.info("appointments.booked", {
+      userId,
+      bookingId: rows[0].booking_id,
+      ticketId: notification.ticket_id,
+      appointmentDate: rows[0].appointment_date,
+      appointmentTime: rows[0].appointment_time,
+    });
+
     return res.status(201).json({
       message: "Appointment booked successfully.",
       appointment: mapAppointment(rows[0]),
@@ -1116,6 +1168,7 @@ const rescheduleAppointment = async (req, res) => {
     const userId = getAuthedUserId(req);
 
     if (!preferredDate || !preferredTime) {
+      logger.warn("appointments.reschedule_rejected", { userId, bookingId, reason: "missing_date_or_time" });
       return res
         .status(400)
         .json({ message: "New date and time are required." });
@@ -1130,6 +1183,7 @@ const rescheduleAppointment = async (req, res) => {
 
     if (existingRows.length === 0) {
       await client.query("ROLLBACK");
+      logger.warn("appointments.reschedule_not_found", { userId, bookingId });
       return res.status(404).json({ message: "Appointment not found." });
     }
 
@@ -1169,6 +1223,14 @@ const rescheduleAppointment = async (req, res) => {
 
     await client.query("COMMIT");
 
+    logger.info("appointments.rescheduled", {
+      userId,
+      bookingId,
+      ticketId: notification.ticket_id,
+      appointmentDate: rows[0].appointment_date,
+      appointmentTime: rows[0].appointment_time,
+    });
+
     return res.status(200).json({
       message: "Appointment rescheduled successfully.",
       appointment: mapAppointment(rows[0]),
@@ -1187,16 +1249,66 @@ const getMyTickets = async (req, res) => {
   try {
     const { userId } = req.params;
     if (!ensureOwnUser(req, res, userId)) return;
+    const search = String(req.query.q || "").trim();
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+    const offset = (page - 1) * limit;
+    const values = [userId];
+    const filters = [
+      "user_id = $1",
+      "notification_status = TRUE",
+    ];
 
-    const { rows } = await pool.query(
-      `SELECT * FROM notification_tickets
-       WHERE user_id = $1
-         AND notification_status = 'true'
-       ORDER BY updated_at DESC`,
-      [userId],
-    );
+    if (search) {
+      values.push(`%${search}%`);
+      filters.push(
+        `(ticket_id ILIKE $${values.length} OR category ILIKE $${values.length} OR subject ILIKE $${values.length} OR query ILIKE $${values.length} OR COALESCE(reply, '') ILIKE $${values.length} OR COALESCE(type, '') ILIKE $${values.length} OR status ILIKE $${values.length})`,
+      );
+    }
 
-    return res.status(200).json({ tickets: rows });
+    const whereClause = `WHERE ${filters.join(" AND ")}`;
+    const countValues = [...values];
+    values.push(limit);
+    values.push(offset);
+
+    const [countResult, ticketsResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::INT AS count
+         FROM notification_tickets
+         ${whereClause}`,
+        countValues,
+      ),
+      pool.query(
+        `SELECT *
+         FROM notification_tickets
+         ${whereClause}
+         ORDER BY updated_at DESC
+         LIMIT $${values.length - 1}
+         OFFSET $${values.length}`,
+        values,
+      ),
+    ]);
+
+    const total = countResult.rows[0]?.count || 0;
+    const rows = ticketsResult.rows;
+
+    logger.info("tickets.listed", {
+      userId,
+      search: Boolean(search),
+      page,
+      limit,
+      resultCount: rows.length,
+      total,
+    });
+    return res.status(200).json({
+      tickets: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (err) {
     logger.error("tickets.list_failed", err, { userId: req.params.userId });
     return res.status(500).json({ message: "Internal server error." });
@@ -1214,9 +1326,11 @@ const deleteNotification = async (req, res) => {
     );
 
     if (rowCount === 0) {
+      logger.warn("notifications.delete_not_found", { userId, ticketId });
       return res.status(404).json({ message: "Notification not found." });
     }
 
+    logger.info("notifications.deleted", { userId, ticketId });
     return res.status(200).json({ message: "Notification cleared." });
   } catch (err) {
     logger.error("notifications.delete_failed", err, { userId: req.params.userId, ticketId: req.params.ticketId });
@@ -1229,11 +1343,12 @@ const clearNotifications = async (req, res) => {
     const { userId } = req.params;
     if (!ensureOwnUser(req, res, userId)) return;
 
-    await pool.query(
+    const { rowCount } = await pool.query(
       `update notification_tickets SET notification_status = 'false' WHERE user_id = $1`,
       [userId],
     );
 
+    logger.info("notifications.cleared", { userId, count: rowCount });
     return res.status(200).json({ message: "All notifications cleared." });
   } catch (err) {
     logger.error("notifications.clear_failed", err, { userId: req.params.userId });

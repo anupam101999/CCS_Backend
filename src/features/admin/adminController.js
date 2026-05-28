@@ -101,6 +101,7 @@ const getAllUsers = async (req, res) => {
     const q = String(req.query.q || "").trim();
 
     if (!q) {
+      logger.info("admin.users_search", { adminId: req.adminId, query: "", resultCount: 0 });
       return res.json({ users: [] });
     }
 
@@ -121,6 +122,7 @@ const getAllUsers = async (req, res) => {
       isNumericId ? [search, q] : [search],
     );
 
+    logger.info("admin.users_search", { adminId: req.adminId, query: q, resultCount: rows.length });
     return res.json({ users: rows });
   } catch (err) {
     logger.error("admin.users_search_failed", err, { adminId: req.adminId });
@@ -148,14 +150,32 @@ const updateAppointment = async (req, res) => {
     const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
     if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      logger.warn("admin.appointment_update_rejected", {
+        adminId: req.adminId,
+        bookingId,
+        reason: "invalid_status",
+        status,
+      });
       return res.status(400).json({ message: "Invalid status." });
     }
 
     if (appointmentDate !== undefined && !DATE_RE.test(appointmentDate)) {
+      logger.warn("admin.appointment_update_rejected", {
+        adminId: req.adminId,
+        bookingId,
+        reason: "invalid_date",
+        appointmentDate,
+      });
       return res.status(400).json({ message: "Invalid appointment date." });
     }
 
     if (appointmentTime !== undefined && !TIME_RE.test(appointmentTime)) {
+      logger.warn("admin.appointment_update_rejected", {
+        adminId: req.adminId,
+        bookingId,
+        reason: "invalid_time",
+        appointmentTime,
+      });
       return res.status(400).json({ message: "Invalid appointment time." });
     }
 
@@ -172,6 +192,11 @@ const updateAppointment = async (req, res) => {
       trimmedCategory === "" ||
       trimmedSubject === ""
     ) {
+      logger.warn("admin.appointment_update_rejected", {
+        adminId: req.adminId,
+        bookingId,
+        reason: "empty_required_field",
+      });
       return res.status(400).json({ message: "Required fields cannot be empty." });
     }
 
@@ -203,12 +228,18 @@ const updateAppointment = async (req, res) => {
 
     if (!rows[0]) {
       await client.query("ROLLBACK");
+      logger.warn("admin.appointment_update_not_found", { adminId: req.adminId, bookingId });
       return res.status(404).json({ message: "Appointment not found." });
     }
 
     await syncAppointmentNotification(client, rows[0]);
     await client.query("COMMIT");
 
+    logger.info("admin.appointment_updated", {
+      adminId: req.adminId,
+      bookingId,
+      status: rows[0].status,
+    });
     return res.json({ appointment: rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -228,6 +259,12 @@ const updateAppointmentStatus = async (req, res) => {
 
     const VALID = ["pending", "confirmed", "cancelled", "completed"];
     if (!VALID.includes(status)) {
+      logger.warn("admin.appointment_status_rejected", {
+        adminId: req.adminId,
+        bookingId,
+        reason: "invalid_status",
+        status,
+      });
       return res.status(400).json({ message: "Invalid status." });
     }
 
@@ -243,12 +280,18 @@ const updateAppointmentStatus = async (req, res) => {
 
     if (!rows[0]) {
       await client.query("ROLLBACK");
+      logger.warn("admin.appointment_status_not_found", { adminId: req.adminId, bookingId });
       return res.status(404).json({ message: "Appointment not found." });
     }
 
     await syncAppointmentNotification(client, rows[0]);
     await client.query("COMMIT");
 
+    logger.info("admin.appointment_status_updated", {
+      adminId: req.adminId,
+      bookingId,
+      status,
+    });
     return res.json({ appointment: rows[0] });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -275,7 +318,10 @@ const getLogs = async (req, res) => {
   try {
     const date = String(req.query.date || "").trim();
     const level = String(req.query.level || "").trim().toLowerCase();
-    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+    const search = String(req.query.q || "").trim();
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+    const offset = (page - 1) * limit;
 
     const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
     const VALID_LEVELS = ["info", "warn", "error"];
@@ -284,6 +330,7 @@ const getLogs = async (req, res) => {
 
     if (date) {
       if (!DATE_RE.test(date)) {
+        logger.warn("admin.logs_query_rejected", { adminId: req.adminId, reason: "invalid_date", date });
         return res.status(400).json({ message: "Invalid date." });
       }
       values.push(date);
@@ -294,24 +341,65 @@ const getLogs = async (req, res) => {
 
     if (level) {
       if (!VALID_LEVELS.includes(level)) {
+        logger.warn("admin.logs_query_rejected", { adminId: req.adminId, reason: "invalid_level", level });
         return res.status(400).json({ message: "Invalid level." });
       }
       values.push(level);
       filters.push(`level = $${values.length}`);
     }
 
+    if (search) {
+      values.push(`%${search}%`);
+      filters.push(
+        `(event ILIKE $${values.length} OR message ILIKE $${values.length} OR meta::text ILIKE $${values.length})`,
+      );
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const countValues = [...values];
     values.push(limit);
+    values.push(offset);
 
-    const { rows } = await pool.query(
-      `SELECT id, level, event, message, meta, created_at
-       FROM app_logs
-       ${filters.length ? `WHERE ${filters.join(" AND ")}` : ""}
-       ORDER BY created_at DESC
-       LIMIT $${values.length}`,
-      values,
-    );
+    const [countResult, logsResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::INT AS count
+         FROM app_logs
+         ${whereClause}`,
+        countValues,
+      ),
+      pool.query(
+        `SELECT id, level, event, message, meta, created_at
+         FROM app_logs
+         ${whereClause}
+         ORDER BY created_at DESC
+         LIMIT $${values.length - 1}
+         OFFSET $${values.length}`,
+        values,
+      ),
+    ]);
 
-    return res.json({ logs: rows });
+    const total = countResult.rows[0]?.count || 0;
+    const rows = logsResult.rows;
+
+    logger.info("admin.logs_listed", {
+      adminId: req.adminId,
+      date,
+      level: level || "all",
+      search: Boolean(search),
+      page,
+      limit,
+      resultCount: rows.length,
+      total,
+    });
+    return res.json({
+      logs: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (err) {
     logger.error("admin.logs_list_failed", err, { adminId: req.adminId });
     return res.status(500).json({ message: "Internal server error." });
@@ -326,6 +414,12 @@ const updateTicket = async (req, res) => {
 
     const VALID = ["open", "in-progress", "resolved", "closed"];
     if (status && !VALID.includes(status)) {
+      logger.warn("admin.ticket_update_rejected", {
+        adminId: req.adminId,
+        ticketId,
+        reason: "invalid_status",
+        status,
+      });
       return res.status(400).json({ message: "Invalid status." });
     }
 
@@ -343,7 +437,16 @@ const updateTicket = async (req, res) => {
       [status || null, trimmedReply || null, ticketId],
     );
 
-    if (!rows[0]) return res.status(404).json({ message: "Ticket not found." });
+    if (!rows[0]) {
+      logger.warn("admin.ticket_update_not_found", { adminId: req.adminId, ticketId });
+      return res.status(404).json({ message: "Ticket not found." });
+    }
+    logger.info("admin.ticket_updated", {
+      adminId: req.adminId,
+      ticketId,
+      status: rows[0].status,
+      hasReply: Boolean(trimmedReply),
+    });
     return res.json({ ticket: rows[0] });
   } catch (err) {
     logger.error("admin.ticket_update_failed", err, { adminId: req.adminId, ticketId: req.params.ticketId });

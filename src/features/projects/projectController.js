@@ -11,11 +11,16 @@ const getProjectsByUserId = async (req, res) => {
     const { userId } = req.params;
 
     if (!userId) {
+      logger.warn("projects.list_rejected", { reason: "missing_user_id", requesterId: req.user?.id });
       return res.status(400).json({
         message: "userId is required.",
       });
     }
     if (!req.user?.isAdmin && String(req.user?.id) !== String(userId)) {
+      logger.warn("projects.list_denied", {
+        requesterId: req.user?.id,
+        requestedUserId: userId,
+      });
       return res.status(403).json({ message: "Forbidden." });
     }
 
@@ -34,6 +39,12 @@ const getProjectsByUserId = async (req, res) => {
       `,
       [userId],
     );
+
+    logger.info("projects.listed", {
+      requesterId: req.user?.id,
+      requestedUserId: userId,
+      resultCount: result.rows.length,
+    });
 
     return res.json({
       success: true,

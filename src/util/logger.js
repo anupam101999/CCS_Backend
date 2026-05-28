@@ -1,24 +1,7 @@
 const { getTimeZone, localTimestamp } = require("./time");
 
-const DB_LOG_META_KEYS = new Set([
-  "at",
-  "timeZone",
-  "utcAt",
-  "method",
-  "path",
-  "statusCode",
-  "durationMs",
-  "userId",
-  "sessionId",
-  "ip",
-  "userAgent",
-  "adminId",
-  "ticketId",
-  "bookingId",
-  "errorCode",
-  "errorName",
-  "errorMessage",
-]);
+const SENSITIVE_META_KEY_RE =
+  /(^password$|passwordhash|sessiontoken|^token$|reseturl|secret|apikey|api_key|authorization|cookie|verificationcode|codehash)/i;
 
 function serializeMeta(meta = {}) {
   return Object.fromEntries(
@@ -36,7 +19,9 @@ function getMessage(payload) {
 
 function toDbMeta(payload) {
   return Object.fromEntries(
-    Object.entries(payload).filter(([key]) => DB_LOG_META_KEYS.has(key)),
+    Object.entries(payload).filter(
+      ([key]) => !["level", "event"].includes(key) && !SENSITIVE_META_KEY_RE.test(key),
+    ),
   );
 }
 

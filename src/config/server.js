@@ -80,6 +80,10 @@ app.use((err, _req, res, next) => {
     err?.message === "Only image files are allowed." ||
     err?.code === "LIMIT_FILE_SIZE"
   ) {
+    logger.warn("upload.rejected", {
+      reason: err.code === "LIMIT_FILE_SIZE" ? "file_too_large" : "invalid_file_type",
+      errorMessage: err.message,
+    });
     return res.status(400).json({
       message:
         err.code === "LIMIT_FILE_SIZE"
@@ -120,6 +124,12 @@ async function startServer() {
           `- ${job.name}: daily at ${job.time} ${timeZone}; next run ${nextDailyRunTimestamp(job.time, timeZone)}; runs inside this server process`,
         );
       }
+      logger.info("server.started", {
+        port: PORT,
+        envName,
+        timeZone,
+        dailyJobsTaskTime: process.env.DAILY_JOBS_TASK_TIME || "02:00",
+      });
       startDailyJobScheduler();
     });
   } catch (err) {

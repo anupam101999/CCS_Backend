@@ -49,6 +49,7 @@ const supabase = createClient(
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
+      logger.warn("upload.generic_rejected", { reason: "missing_file", userId: req.user?.id });
       return res.status(400).json({
         error: "No file uploaded",
       });
@@ -64,12 +65,24 @@ const uploadFile = async (req, res) => {
       });
 
     if (error) {
+      logger.warn("upload.generic_storage_rejected", {
+        userId: req.user?.id,
+        fileName,
+        errorMessage: error.message,
+      });
       return res.status(400).json(error);
     }
 
     const { data: publicData } = supabase.storage
       .from("uploads")
       .getPublicUrl(`documents/${fileName}`);
+
+    logger.info("upload.generic_completed", {
+      userId: req.user?.id,
+      fileName,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
 
     return res.json({
       success: true,
@@ -91,6 +104,7 @@ const getUseravatarurl = async (req, res) => {
   const { userId } = req.query;
 
   if (!userId) {
+    logger.warn("upload.avatar_lookup_rejected", { reason: "missing_user_id", userId: req.user?.id });
     return res.status(400).json({
       message: "userId is required.",
     });
@@ -101,6 +115,12 @@ const getUseravatarurl = async (req, res) => {
       `SELECT avatarurl FROM users WHERE id = $1 LIMIT 1`,
       [userId],
     );
+
+    logger.info("upload.avatar_lookup_completed", {
+      requesterId: req.user?.id,
+      userId,
+      found: Boolean(rows[0]?.avatarurl),
+    });
 
     return res.json({
       avatarurl: rows[0]?.avatarurl || null,
@@ -122,13 +142,16 @@ const uploadUseravatarurl = async (req, res) => {
     const file = req.file;
     const userId = String(req.body?.userId || "").trim();
     if (!file) {
+      logger.warn("upload.avatar_rejected", { reason: "missing_file", userId });
       return res.status(400).json({ message: "No file uploaded." });
     }
     if (!userId) {
+      logger.warn("upload.avatar_rejected", { reason: "missing_user_id" });
       return res.status(400).json({ message: "userId is required." });
     }
 
     if (!file.mimetype.startsWith("image/")) {
+      logger.warn("upload.avatar_rejected", { reason: "invalid_file_type", userId, mimetype: file.mimetype });
       return res.status(400).json({ message: "Only image files are allowed." });
     }
 
@@ -145,6 +168,12 @@ const uploadUseravatarurl = async (req, res) => {
 
     const { data } = supabase.storage.from("uploads").getPublicUrl(fileName);
 
+    logger.info("upload.avatar_completed", {
+      userId,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+
     return res.json({ avatarurl: data.publicUrl });
   } catch (err) {
     logger.error("upload.avatar_failed", err, { userId: req.body?.userId });
@@ -159,12 +188,15 @@ const uploadProjectPhoto = async (req, res) => {
     const projectName = String(req.body?.projectName || "").trim();
 
     if (!files.length) {
+      logger.warn("upload.project_photo_rejected", { adminId: req.adminId, reason: "missing_files", userId, projectName });
       return res.status(400).json({ message: "No files uploaded." });
     }
     if (!userId) {
+      logger.warn("upload.project_photo_rejected", { adminId: req.adminId, reason: "missing_user_id", projectName });
       return res.status(400).json({ message: "userId is required." });
     }
     if (!projectName) {
+      logger.warn("upload.project_photo_rejected", { adminId: req.adminId, reason: "missing_project_name", userId });
       return res.status(400).json({ message: "projectName is required." });
     }
     const userExists = await pool.query(
@@ -173,6 +205,7 @@ const uploadProjectPhoto = async (req, res) => {
     );
 
     if (!userExists.rows[0]) {
+      logger.warn("upload.project_photo_rejected", { adminId: req.adminId, reason: "customer_not_found", userId, projectName });
       return res.status(404).json({ message: "Customer not found." });
     }
 
@@ -181,6 +214,13 @@ const uploadProjectPhoto = async (req, res) => {
 
     for (const file of files) {
       if (!file.mimetype.startsWith("image/")) {
+        logger.warn("upload.project_photo_rejected", {
+          adminId: req.adminId,
+          reason: "invalid_file_type",
+          userId,
+          projectName,
+          mimetype: file.mimetype,
+        });
         return res.status(400).json({ message: "Only image files are allowed." });
       }
 
@@ -209,6 +249,13 @@ const uploadProjectPhoto = async (req, res) => {
         storagePath,
       });
     }
+
+    logger.info("upload.project_photo_completed", {
+      adminId: req.adminId,
+      userId,
+      projectName,
+      count: uploadedProjects.length,
+    });
 
     return res.json({
       success: true,

@@ -5,7 +5,14 @@ const requireSession = async (req, res, next) => {
   try {
     const token = req.headers["authorization"]?.replace("Bearer ", "").trim();
 
-    if (!token) return res.status(401).json({ message: "Unauthorized." });
+    if (!token) {
+      logger.warn("auth.session_missing", {
+        method: req.method,
+        path: req.originalUrl,
+        ip: req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress,
+      });
+      return res.status(401).json({ message: "Unauthorized." });
+    }
 
     const { rows } = await pool.query(
       `SELECT s.session_id, s.session_token, s.user_id, u.email, u.is_admin
@@ -19,6 +26,11 @@ const requireSession = async (req, res, next) => {
     );
 
     if (!rows[0]) {
+      logger.warn("auth.session_invalid", {
+        method: req.method,
+        path: req.originalUrl,
+        ip: req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress,
+      });
       return res.status(401).json({ message: "Session invalid or expired." });
     }
 

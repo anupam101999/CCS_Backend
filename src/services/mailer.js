@@ -1,3 +1,5 @@
+const logger = require("../util/logger");
+
 let configLogged = false;
 
 function getBrevoConfig() {
@@ -41,11 +43,23 @@ async function sendMail({ to, subject, text, html }) {
   const config = getBrevoConfig();
 
   if (!config.apiKey || !config.from) {
-    console.error("[MAIL FAILED] Missing BREVO_API_KEY or MAIL_FROM", {
+    logger.warn("mail.config_missing", {
       hasApiKey: Boolean(config.apiKey),
       hasFrom: Boolean(config.from),
+      to,
+      subject,
     });
     return false;
+  }
+
+  if (!configLogged) {
+    logger.info("mail.config_loaded", {
+      apiBaseUrl: config.apiBaseUrl,
+      from: config.from,
+      fromName: config.fromName,
+      apiKey: maskSecret(config.apiKey),
+    });
+    configLogged = true;
   }
 
   try {
@@ -75,11 +89,10 @@ async function sendMail({ to, subject, text, html }) {
       );
     }
 
+    logger.info("mail.sent", { to, subject });
     return true;
   } catch (err) {
-    console.error("[MAIL FAILED]", {
-      message: err.message,
-    });
+    logger.error("mail.send_failed", err, { to, subject });
 
     return false;
   }

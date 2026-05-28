@@ -4,7 +4,14 @@ const logger = require("../util/logger");
 const requireAdmin = async (req, res, next) => {
   try {
     const token = req.headers["authorization"]?.replace("Bearer ", "").trim();
-    if (!token) return res.status(401).json({ message: "Unauthorized." });
+    if (!token) {
+      logger.warn("auth.admin_session_missing", {
+        method: req.method,
+        path: req.originalUrl,
+        ip: req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress,
+      });
+      return res.status(401).json({ message: "Unauthorized." });
+    }
 
     const { rows } = await pool.query(
       `SELECT s.session_id, u.id, u.email, u.is_admin
@@ -18,6 +25,12 @@ const requireAdmin = async (req, res, next) => {
     );
 
     if (!rows[0] || !rows[0].is_admin) {
+      logger.warn("auth.admin_access_denied", {
+        method: req.method,
+        path: req.originalUrl,
+        userId: rows[0]?.id,
+        hasSession: Boolean(rows[0]),
+      });
       return res.status(403).json({ message: "Admin access required." });
     }
 
