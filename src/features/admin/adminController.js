@@ -271,6 +271,53 @@ const getAllTickets = async (req, res) => {
   }
 };
 
+const getLogs = async (req, res) => {
+  try {
+    const date = String(req.query.date || "").trim();
+    const level = String(req.query.level || "").trim().toLowerCase();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    const VALID_LEVELS = ["info", "warn", "error"];
+    const filters = [];
+    const values = [];
+
+    if (date) {
+      if (!DATE_RE.test(date)) {
+        return res.status(400).json({ message: "Invalid date." });
+      }
+      values.push(date);
+      filters.push(
+        `created_at >= $${values.length}::date AND created_at < ($${values.length}::date + INTERVAL '1 day')`,
+      );
+    }
+
+    if (level) {
+      if (!VALID_LEVELS.includes(level)) {
+        return res.status(400).json({ message: "Invalid level." });
+      }
+      values.push(level);
+      filters.push(`level = $${values.length}`);
+    }
+
+    values.push(limit);
+
+    const { rows } = await pool.query(
+      `SELECT id, level, event, message, meta, created_at
+       FROM app_logs
+       ${filters.length ? `WHERE ${filters.join(" AND ")}` : ""}
+       ORDER BY created_at DESC
+       LIMIT $${values.length}`,
+      values,
+    );
+
+    return res.json({ logs: rows });
+  } catch (err) {
+    logger.error("admin.logs_list_failed", err, { adminId: req.adminId });
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
 const updateTicket = async (req, res) => {
   try {
     const { ticketId } = req.params;
@@ -312,4 +359,5 @@ module.exports = {
   updateAppointmentStatus,
   getAllTickets,
   updateTicket,
+  getLogs,
 };

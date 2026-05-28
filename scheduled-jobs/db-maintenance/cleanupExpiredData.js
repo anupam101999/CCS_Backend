@@ -9,6 +9,7 @@ const dryRun = String(process.env.DB_MAINTENANCE_DRY_RUN || "").toLowerCase() ==
 const inactiveSessionRetentionDays = Number(
   process.env.DB_MAINTENANCE_INACTIVE_SESSION_RETENTION_DAYS || 90,
 );
+const appLogRetentionDays = Number(process.env.APP_LOG_RETENTION_DAYS || 3);
 
 const countQueries = {
   expiredPendingRegistrations: `
@@ -38,10 +39,20 @@ const countQueries = {
     WHERE is_active = FALSE
       AND COALESCE(logout_time, token_refresh_time, login_time) < NOW() - ($1 || ' days')::INTERVAL
   `,
+  oldAppLogs: `
+    SELECT COUNT(*)::INT AS count
+    FROM app_logs
+    WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+  `,
 };
 
 async function getCount(client, name) {
-  const values = name === "oldInactiveSessions" ? [inactiveSessionRetentionDays] : [];
+  const values =
+    name === "oldInactiveSessions"
+      ? [inactiveSessionRetentionDays]
+      : name === "oldAppLogs"
+        ? [appLogRetentionDays]
+        : [];
   const { rows } = await client.query(countQueries[name], values);
 
   return rows[0]?.count || 0;
@@ -90,12 +101,21 @@ async function runCleanup(client) {
     [inactiveSessionRetentionDays],
   );
 
+  const oldAppLogs = await client.query(
+    `
+      DELETE FROM app_logs
+      WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+    `,
+    [appLogRetentionDays],
+  );
+
   return {
     expiredPendingRegistrations: expiredPendingRegistrations.rowCount,
     expiredPendingEmailChanges: expiredPendingEmailChanges.rowCount,
     expiredOrUsedPasswordResetTokens: expiredOrUsedPasswordResetTokens.rowCount,
     expiredActiveSessions: expiredActiveSessions.rowCount,
     oldInactiveSessions: oldInactiveSessions.rowCount,
+    oldAppLogs: oldAppLogs.rowCount,
   };
 }
 
@@ -103,7 +123,7 @@ async function main(options = {}) {
   const closePool = options.closePool !== false;
 
   console.log("DB maintenance: started");
-  console.log(`DB maintenance: dryRun=${dryRun}, inactiveSessionRetentionDays=${inactiveSessionRetentionDays}`);
+  console.log(`DB maintenance: dryRun=${dryRun}, inactiveSessionRetentionDays=${inactiveSessionRetentionDays}, appLogRetentionDays=${appLogRetentionDays}`);
 
   const client = await pool.connect();
 
@@ -113,6 +133,7 @@ async function main(options = {}) {
       logger.info("db_maintenance.dry_run", {
         dryRun,
         inactiveSessionRetentionDays,
+        appLogRetentionDays,
         ...counts,
       });
 
@@ -128,6 +149,7 @@ async function main(options = {}) {
     logger.info("db_maintenance.completed", {
       dryRun,
       inactiveSessionRetentionDays,
+      appLogRetentionDays,
       ...counts,
     });
     console.log(`DB maintenance: completed ${JSON.stringify(counts)}`);

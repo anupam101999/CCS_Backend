@@ -159,6 +159,17 @@ async function dbCreateQuery() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS app_logs (
+        id BIGSERIAL PRIMARY KEY,
+        level VARCHAR(10) NOT NULL,
+        event VARCHAR(120) NOT NULL,
+        message TEXT,
+        meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     // ── Indexes ───────────────────────────────────────────────────
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_user_sessions_token
@@ -189,6 +200,16 @@ async function dbCreateQuery() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_projects_user_id
       ON projects(user_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_app_logs_created_at
+      ON app_logs(created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_app_logs_level_created_at
+      ON app_logs(level, created_at DESC);
     `);
 
     await client.query(`

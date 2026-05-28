@@ -8,6 +8,7 @@ const {
   updateAppointmentStatus,
   getAllTickets,
   updateTicket,
+  getLogs,
 } = require("./adminController");
 
 adminRoutes.get("/stats",                          requireAdmin, getStats);
@@ -17,5 +18,6 @@ adminRoutes.put("/appointments/:bookingId",        requireAdmin, updateAppointme
 adminRoutes.put("/appointments/:bookingId/status", requireAdmin, updateAppointmentStatus);
 adminRoutes.get("/tickets",                        requireAdmin, getAllTickets);
 adminRoutes.put("/tickets/:ticketId",              requireAdmin, updateTicket);
+adminRoutes.get("/logs",                           requireAdmin, getLogs);
 
 module.exports = adminRoutes;
