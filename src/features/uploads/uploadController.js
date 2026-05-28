@@ -97,43 +97,13 @@ const getUseravatarurl = async (req, res) => {
   }
 
   try {
-    const { data, error } = await supabase.storage
-      .from("uploads")
-      .list("avatarurls", {
-        search: `${userId}-`,
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    if (!data || data.length === 0) {
-      return res.json({
-        avatarurl: null,
-      });
-    }
-
-    const latest = data
-      .filter((f) => f.name.startsWith(`${userId}-`))
-      .sort((a, b) => {
-        const tsA = parseInt(a.name.split("-")[1]) || 0;
-        const tsB = parseInt(b.name.split("-")[1]) || 0;
-
-        return tsB - tsA;
-      })[0];
-
-    if (!latest) {
-      return res.json({
-        avatarurl: null,
-      });
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("uploads")
-      .getPublicUrl(`avatarurls/${latest.name}`);
+    const { rows } = await pool.query(
+      `SELECT avatarurl FROM users WHERE id = $1 LIMIT 1`,
+      [userId],
+    );
 
     return res.json({
-      avatarurl: urlData.publicUrl,
+      avatarurl: rows[0]?.avatarurl || null,
     });
   } catch (err) {
     logger.error("upload.avatar_lookup_failed", err, { userId });

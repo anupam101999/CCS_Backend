@@ -1,3 +1,5 @@
+const { getTimeZone, localTimestamp } = require("./time");
+
 function serializeMeta(meta = {}) {
   return Object.fromEntries(
     Object.entries(meta).filter(([, value]) => value !== undefined && value !== null),
@@ -5,10 +7,13 @@ function serializeMeta(meta = {}) {
 }
 
 function log(level, event, meta) {
+  const now = new Date();
   const payload = {
     level,
     event,
-    at: new Date().toISOString(),
+    at: localTimestamp(now),
+    timeZone: getTimeZone(),
+    utcAt: now.toISOString(),
     ...serializeMeta(meta),
   };
 

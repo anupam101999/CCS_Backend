@@ -1,6 +1,7 @@
 const pool = require("../../config/db");
 const crypto = require("crypto");
 const logger = require("../../util/logger");
+const { localTimestamp } = require("../../util/time");
 const {
   sendEmailChangeOtp,
   sendPasswordReset,
@@ -660,7 +661,7 @@ const tokenRefresh = async (req, res) => {
     return res.json({
       valid: true,
       token: newToken,
-      refreshedAt: new Date().toISOString(),
+      refreshedAt: localTimestamp(),
     });
   } catch (err) {
     logger.error("auth.token_refresh_failed", err, { userId: req.user?.id });

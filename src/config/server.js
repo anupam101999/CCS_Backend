@@ -8,6 +8,12 @@ const adminRoutes = require("../features/admin/adminRoutes");
 const uploadRoutes = require("../features/uploads/uploadRoutes");
 const projectRoutes = require("../features/projects/projectRoutes");
 const logger = require("../util/logger");
+const {
+  getTimeZone,
+  localTimestamp,
+  nextDailyRunTimestamp,
+} = require("../util/time");
+const { startDailyJobScheduler } = require("../services/dailyJobScheduler");
 const { requestLogger } = require("../middleware/requestLogger");
 
 const app = express();
@@ -62,7 +68,11 @@ app.get("/", (_req, res) =>
 );
 
 app.get("/health", (_req, res) =>
-  res.json({ status: "ok", time: new Date().toISOString() }),
+  res.json({
+    status: "ok",
+    time: localTimestamp(),
+    timeZone: getTimeZone(),
+  }),
 );
 
 app.use((err, _req, res, next) => {
@@ -92,9 +102,25 @@ async function startServer() {
     await dbCreateQuery();
     app.listen(PORT, () => {
       const envName = process.env.NODE_ENV || "development";
+      const timeZone = getTimeZone();
+      const batchJobs = [
+        {
+          name: "CCS daily jobs",
+          time: process.env.DAILY_JOBS_TASK_TIME || "02:00",
+        },
+      ];
+
       console.log(
         `CCS Backend server running on port ${PORT} in ${envName} mode`,
       );
+      console.log(`Server started at ${localTimestamp()} (${timeZone})`);
+      console.log("Batch jobs:");
+      for (const job of batchJobs) {
+        console.log(
+          `- ${job.name}: daily at ${job.time} ${timeZone}; next run ${nextDailyRunTimestamp(job.time, timeZone)}; runs inside this server process`,
+        );
+      }
+      startDailyJobScheduler();
     });
   } catch (err) {
     logger.error("server.start_failed", err);

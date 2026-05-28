@@ -5,7 +5,10 @@
   "main": "src/config/server.js",
   "scripts": {
     "start": "node src/config/server.js",
-    "dev": "nodemon src/config/server.js"
+    "dev": "nodemon src/config/server.js",
+    "cleanup:avatars": "node scheduled-jobs/avatar-cleanup/cleanupAvatarUrls.js",
+    "maintenance:db": "node scheduled-jobs/db-maintenance/cleanupExpiredData.js",
+    "maintenance:daily": "node scheduled-jobs/avatar-cleanup/cleanupAvatarUrls.js && node scheduled-jobs/db-maintenance/cleanupExpiredData.js"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.0",
