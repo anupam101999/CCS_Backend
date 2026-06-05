@@ -8,7 +8,8 @@ const {
 const { addNotificationClient } = require("../../services/notificationEvents");
 
 async function authenticateStream(req, res, next) {
-  const token = String(req.query.token || "").trim();
+  const authHeader = String(req.headers.authorization || "");
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   if (!token) {
     return res.status(401).json({ code: "ACCESS_TOKEN_MISSING", message: "Unauthorized." });
   }
