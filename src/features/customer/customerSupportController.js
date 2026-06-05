@@ -93,7 +93,7 @@ const updateTicket = async (req, res) => {
            subject = COALESCE($2, subject),
            query = COALESCE($3, query),
            photo_urls = COALESCE($4, photo_urls),
-           updated_at = NOW()
+           updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE ticket_id = $5
          AND user_id = $6
          AND COALESCE(type, '') <> 'Appointment'
@@ -310,8 +310,8 @@ const markNotificationRead = async (req, res) => {
     const { rows } = await pool.query(
       `UPDATE notification_tickets
        SET is_read = TRUE,
-           read_at = COALESCE(read_at, NOW()),
-           updated_at = NOW()
+           read_at = COALESCE(read_at, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')),
+           updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE user_id = $1
          AND ticket_id = $2
        RETURNING ticket_id, is_read, read_at`,
@@ -342,7 +342,7 @@ const clearHomeNotification = async (req, res) => {
     const { rowCount } = await pool.query(
       `UPDATE notification_tickets
        SET is_visible_in_home = FALSE,
-           home_dismissed_at = NOW()
+           home_dismissed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE user_id = $1
          AND ticket_id = $2`,
       [userId, ticketId],
@@ -372,7 +372,7 @@ const clearHomeNotifications = async (req, res) => {
     const { rowCount } = await pool.query(
       `UPDATE notification_tickets
        SET is_visible_in_home = FALSE,
-           home_dismissed_at = NOW()
+           home_dismissed_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE user_id = $1
          AND is_read = FALSE`,
       [userId],
@@ -408,7 +408,7 @@ const deleteTicketPhoto = async (req, res) => {
     const nextUrls = (ticket.photo_urls || []).filter((url) => url !== photoUrl);
 
     await pool.query(
-      `UPDATE notification_tickets SET photo_urls = $1, updated_at = NOW() WHERE ticket_id = $2`,
+      `UPDATE notification_tickets SET photo_urls = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') WHERE ticket_id = $2`,
       [toJsonb(nextUrls), ticketId],
     );
 
@@ -447,7 +447,7 @@ const deleteAppointmentPhoto = async (req, res) => {
 
     await pool.query(
       `UPDATE appointment_bookings
-       SET photo_urls = $1, updated_at = NOW()
+       SET photo_urls = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE booking_id = $2`,
       [toJsonb(nextUrls), bookingId],
     );
@@ -455,7 +455,7 @@ const deleteAppointmentPhoto = async (req, res) => {
     if (appointment.notification_ticket_id) {
       await pool.query(
         `UPDATE notification_tickets
-         SET photo_urls = $1, updated_at = NOW()
+         SET photo_urls = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
          WHERE ticket_id = $2`,
         [toJsonb(nextUrls), appointment.notification_ticket_id],
       );
@@ -476,7 +476,7 @@ const deleteNotification = async (req, res) => {
     const { rowCount } = await pool.query(
       `UPDATE notification_tickets
        SET is_visible_in_updates = FALSE,
-           updates_cleared_at = NOW()
+           updates_cleared_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE user_id = $1
          AND ticket_id = $2`,
       [userId, ticketId],
@@ -503,7 +503,7 @@ const clearNotifications = async (req, res) => {
     const { rowCount } = await pool.query(
       `UPDATE notification_tickets
        SET is_visible_in_updates = FALSE,
-           updates_cleared_at = NOW()
+           updates_cleared_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE user_id = $1`,
       [userId],
     );

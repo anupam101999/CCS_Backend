@@ -69,7 +69,7 @@ const register = async (req, res) => {
       `INSERT INTO pending_registrations
         (request_id, full_name, email, phone, dob, address, password_hash, avatarurl, code_hash, expires_at)
        VALUES
-        ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + ($10 || ' minutes')::INTERVAL)`,
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') + ($10 || ' minutes')::INTERVAL)`,
       [
         requestId,
         fullName.trim(),
@@ -128,7 +128,7 @@ const verifyRegistrationEmail = async (req, res) => {
        FROM pending_registrations
        WHERE request_id = $1
          AND code_hash = $2
-         AND expires_at > NOW()
+         AND expires_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        LIMIT 1`,
       [verificationId, hashVerificationCode(verificationId, String(code).trim())],
     );
@@ -299,7 +299,7 @@ const requestPasswordReset = async (req, res) => {
 
     await pool.query(
       `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, NOW() + ($3 || ' minutes')::INTERVAL)`,
+       VALUES ($1, $2, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') + ($3 || ' minutes')::INTERVAL)`,
       [userId, tokenHash, PASSWORD_RESET_TOKEN_MINUTES],
     );
 
@@ -345,7 +345,7 @@ const resetPassword = async (req, res) => {
     const { rows } = await client.query(
       `SELECT id, user_id
        FROM password_reset_tokens
-       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        LIMIT 1`,
       [hashResetToken(token)],
     );
@@ -363,7 +363,7 @@ const resetPassword = async (req, res) => {
       rows[0].user_id,
     ]);
     await client.query(
-      `UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`,
+      `UPDATE password_reset_tokens SET used_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') WHERE id = $1`,
       [rows[0].id],
     );
     await deleteUserSessions(client, rows[0].user_id);

@@ -49,7 +49,7 @@ async function syncAppointmentNotification(client, appointment) {
          home_dismissed_at = NULL,
          updates_cleared_at = NULL,
          photo_urls = $6,
-         updated_at = NOW()
+         updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
      WHERE ticket_id = $7`,
     [
       notification.category,
@@ -85,27 +85,27 @@ const getStats = async (req, res) => {
     const { rows } = await pool.query(`
       SELECT
         (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE) AS "totalUsers",
-        (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE AND created_at >= NOW() - INTERVAL '7 days') AS "newCustomers7Days",
+        (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE AND created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '7 days') AS "newCustomers7Days",
         (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE AND avatarurl IS NOT NULL AND avatarurl <> '') AS "customersWithAvatar",
-        (SELECT COUNT(DISTINCT user_id)::INT FROM auth_sessions WHERE last_active_at > NOW() - INTERVAL '30 days') AS "activeUsers",
+        (SELECT COUNT(DISTINCT user_id)::INT FROM auth_sessions WHERE last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '30 days') AS "activeUsers",
         (SELECT COUNT(DISTINCT user_id)::INT FROM projects) AS "customersWithProjects",
         (SELECT COUNT(*)::INT FROM projects) AS "projectPhotos",
-        (SELECT COUNT(*)::INT FROM projects WHERE created_at >= NOW() - INTERVAL '7 days') AS "projectPhotos7Days",
+        (SELECT COUNT(*)::INT FROM projects WHERE created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '7 days') AS "projectPhotos7Days",
         (SELECT COUNT(*)::INT FROM appointment_bookings) AS "totalAppointments",
         (SELECT COUNT(*)::INT FROM appointment_bookings WHERE status = 'pending') AS "pendingAppointments",
         (SELECT COUNT(*)::INT FROM appointment_bookings WHERE status = 'confirmed') AS "confirmedAppointments",
         (SELECT COUNT(*)::INT FROM appointment_bookings WHERE status = 'cancelled') AS "cancelledAppointments",
         (SELECT COUNT(*)::INT FROM appointment_bookings WHERE status = 'completed') AS "completedAppointments",
-        (SELECT COUNT(*)::INT FROM appointment_bookings WHERE appointment_date = CURRENT_DATE) AS "appointmentsToday",
-        (SELECT COUNT(*)::INT FROM appointment_bookings WHERE appointment_date >= CURRENT_DATE AND appointment_date < CURRENT_DATE + INTERVAL '7 days') AS "appointmentsNext7Days",
-        (SELECT COUNT(*)::INT FROM appointment_bookings WHERE appointment_date < CURRENT_DATE AND status IN ('pending', 'confirmed')) AS "overdueAppointments",
+        (SELECT COUNT(*)::INT FROM appointment_bookings WHERE appointment_date = ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date)) AS "appointmentsToday",
+        (SELECT COUNT(*)::INT FROM appointment_bookings WHERE appointment_date >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date) AND appointment_date < ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date) + INTERVAL '7 days') AS "appointmentsNext7Days",
+        (SELECT COUNT(*)::INT FROM appointment_bookings WHERE appointment_date < ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date) AND status IN ('pending', 'confirmed')) AS "overdueAppointments",
         (SELECT COUNT(*)::INT FROM notification_tickets) AS "totalTickets",
         (SELECT COUNT(*)::INT FROM notification_tickets WHERE status = 'open') AS "openTickets",
         (SELECT COUNT(*)::INT FROM notification_tickets WHERE status = 'in-progress') AS "inProgressTickets",
         (SELECT COUNT(*)::INT FROM notification_tickets WHERE status = 'resolved') AS "resolvedTickets",
         (SELECT COUNT(*)::INT FROM notification_tickets WHERE status = 'closed') AS "closedTickets",
-        (SELECT COUNT(*)::INT FROM notification_tickets WHERE created_at >= NOW() - INTERVAL '24 hours') AS "newTickets24Hours",
-        (SELECT COUNT(*)::INT FROM notification_tickets WHERE created_at >= NOW() - INTERVAL '7 days') AS "newTickets7Days",
+        (SELECT COUNT(*)::INT FROM notification_tickets WHERE created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '24 hours') AS "newTickets24Hours",
+        (SELECT COUNT(*)::INT FROM notification_tickets WHERE created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '7 days') AS "newTickets7Days",
         (SELECT COUNT(*)::INT
          FROM notification_tickets nt
          WHERE nt.status IN ('open', 'in-progress')
@@ -323,7 +323,7 @@ const updateAppointment = async (req, res) => {
            appointment_date = COALESCE($6, appointment_date),
            appointment_time = COALESCE($7, appointment_time),
            status = COALESCE($8, status),
-           updated_at = NOW()
+           updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE booking_id = $9
        RETURNING *`,
       [
@@ -399,7 +399,7 @@ const updateAppointmentStatus = async (req, res) => {
 
     const { rows } = await client.query(
       `UPDATE appointment_bookings
-       SET status = $1, updated_at = NOW()
+       SET status = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE booking_id = $2
        RETURNING *`,
       [status, bookingId],
@@ -763,7 +763,7 @@ const updateTicket = async (req, res) => {
              WHEN $2 IS NOT NULL THEN NULL
              ELSE updates_cleared_at
            END,
-           updated_at = NOW()
+           updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE ticket_id = $3
        RETURNING *`,
       [status || null, trimmedReply || null, ticketId],

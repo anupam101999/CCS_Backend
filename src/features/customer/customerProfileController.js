@@ -65,7 +65,7 @@ const requestEmailChange = async (req, res) => {
       `INSERT INTO pending_email_changes
         (request_id, user_id, new_email, code_hash, expires_at)
        VALUES
-        ($1, $2, $3, $4, NOW() + ($5 || ' minutes')::INTERVAL)`,
+        ($1, $2, $3, $4, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') + ($5 || ' minutes')::INTERVAL)`,
       [
         requestId,
         userId,
@@ -123,7 +123,7 @@ const verifyEmailChange = async (req, res) => {
        WHERE request_id = $1
          AND user_id = $2
          AND code_hash = $3
-         AND expires_at > NOW()
+         AND expires_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        LIMIT 1`,
       [
         verificationId,
@@ -157,7 +157,7 @@ const verifyEmailChange = async (req, res) => {
 
     const { rows: updatedRows } = await client.query(
       `UPDATE users
-       SET email = $1, updated_at = NOW()
+       SET email = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE id = $2
        RETURNING id, full_name, email, phone, dob, address, is_admin, is_manager, avatarurl`,
       [pending.new_email, userId],
@@ -243,7 +243,7 @@ const update = async (req, res) => {
                address = $6,
                password = $7,
                avatarurl = $8,
-               updated_at = NOW()
+               updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
            WHERE id = $1
            RETURNING id, full_name, email, phone, dob, address, avatarurl`,
           [
@@ -269,7 +269,7 @@ const update = async (req, res) => {
              dob = $5,
              address = $6,
              avatarurl = $7,
-             updated_at = NOW()
+             updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
          WHERE id = $1
          RETURNING id, full_name, email, phone, dob, address, avatarurl`,
         [

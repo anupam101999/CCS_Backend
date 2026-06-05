@@ -137,7 +137,7 @@ async function makeTicketVisibleInUpdates(db, ticketId) {
   const { rows } = await db.query(
     `UPDATE notification_tickets
      SET is_visible_in_updates = TRUE,
-         updated_at = NOW()
+         updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
      WHERE ticket_id = $1
      RETURNING ${TICKET_RETURNING_FIELDS}`,
     [ticketId],

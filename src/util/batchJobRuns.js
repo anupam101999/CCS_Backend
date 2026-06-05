@@ -26,13 +26,13 @@ async function ensureBatchJobRunsTable() {
       run_source VARCHAR(60) NOT NULL DEFAULT 'manual',
       run_status VARCHAR(20) NOT NULL DEFAULT 'running',
       dry_run BOOLEAN NOT NULL DEFAULT FALSE,
-      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      finished_at TIMESTAMPTZ,
+      started_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+      finished_at TIMESTAMP,
       duration_ms INTEGER,
       metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
       error_message TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+      updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
       CONSTRAINT batch_job_runs_status_check
         CHECK (run_status IN ('running', 'success', 'failed', 'skipped'))
     );
@@ -63,7 +63,7 @@ async function startBatchJobRun({
     `INSERT INTO batch_job_runs (
        job_name, run_source, run_status, dry_run, metadata, started_at, created_at, updated_at
      )
-     VALUES ($1, $2, 'running', $3, $4::jsonb, NOW(), NOW(), NOW())
+     VALUES ($1, $2, 'running', $3, $4::jsonb, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'), (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))
      RETURNING id, started_at`,
     [jobName, runSource, dryRun, JSON.stringify(normalizeMetadata(metadata))],
   );
@@ -81,14 +81,14 @@ async function finishBatchJobRun(runId, {
   await pool.query(
     `UPDATE batch_job_runs
      SET run_status = $1,
-         finished_at = NOW(),
+         finished_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
          duration_ms = GREATEST(
            0,
-           FLOOR(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::INT
+           FLOOR(EXTRACT(EPOCH FROM ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - started_at)) * 1000)::INT
          ),
          metadata = metadata || $2::jsonb,
          error_message = $3,
-         updated_at = NOW()
+         updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
      WHERE id = $4`,
     [
       status,

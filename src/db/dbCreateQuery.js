@@ -23,8 +23,8 @@ async function dbCreateQuery() {
         is_admin BOOLEAN NOT NULL DEFAULT FALSE,
         is_manager BOOLEAN NOT NULL DEFAULT FALSE,
         password VARCHAR(255) NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -56,13 +56,13 @@ async function dbCreateQuery() {
         is_visible_in_updates BOOLEAN NOT NULL DEFAULT TRUE,
         is_visible_in_home BOOLEAN NOT NULL DEFAULT TRUE,
         is_read BOOLEAN NOT NULL DEFAULT FALSE,
-        read_at TIMESTAMPTZ,
-        home_dismissed_at TIMESTAMPTZ,
-        updates_cleared_at TIMESTAMPTZ,
+        read_at TIMESTAMP,
+        home_dismissed_at TIMESTAMP,
+        updates_cleared_at TIMESTAMP,
         status VARCHAR(20) NOT NULL DEFAULT 'open',
 
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -87,8 +87,8 @@ async function dbCreateQuery() {
         notification_ticket_id VARCHAR(14)
           REFERENCES notification_tickets(ticket_id) ON DELETE SET NULL,
 
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -102,7 +102,7 @@ async function dbCreateQuery() {
         author_role VARCHAR(20) NOT NULL,
         message_body TEXT NOT NULL,
         is_internal BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
         CONSTRAINT notification_ticket_messages_role_check
           CHECK (author_role IN ('customer', 'admin', 'manager', 'system'))
       );
@@ -150,17 +150,17 @@ async function dbCreateQuery() {
 
     await client.query(`
       ALTER TABLE notification_tickets
-      ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;
     `);
 
     await client.query(`
       ALTER TABLE notification_tickets
-      ADD COLUMN IF NOT EXISTS home_dismissed_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS home_dismissed_at TIMESTAMP;
     `);
 
     await client.query(`
       ALTER TABLE notification_tickets
-      ADD COLUMN IF NOT EXISTS updates_cleared_at TIMESTAMPTZ;
+      ADD COLUMN IF NOT EXISTS updates_cleared_at TIMESTAMP;
     `);
 
     await client.query(`
@@ -201,7 +201,7 @@ async function dbCreateQuery() {
         session_id UUID PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         refresh_token_hash VARCHAR(64) NOT NULL,
-        last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        last_active_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -211,9 +211,9 @@ async function dbCreateQuery() {
         user_id INTEGER NOT NULL
           REFERENCES users(id) ON DELETE CASCADE,
         token_hash VARCHAR(64) NOT NULL UNIQUE,
-        expires_at TIMESTAMPTZ NOT NULL,
-        used_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -229,8 +229,8 @@ async function dbCreateQuery() {
         avatarurl TEXT,
         password_hash VARCHAR(255) NOT NULL,
         code_hash VARCHAR(64) NOT NULL,
-        expires_at TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -242,8 +242,8 @@ async function dbCreateQuery() {
           REFERENCES users(id) ON DELETE CASCADE,
         new_email VARCHAR(254) NOT NULL,
         code_hash VARCHAR(64) NOT NULL,
-        expires_at TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -259,8 +259,8 @@ async function dbCreateQuery() {
         project_name VARCHAR(255) NOT NULL,
         photourl TEXT,
 
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -271,7 +271,7 @@ async function dbCreateQuery() {
         event VARCHAR(120) NOT NULL,
         message TEXT,
         meta JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
       );
     `);
 
@@ -282,13 +282,13 @@ async function dbCreateQuery() {
         run_source VARCHAR(60) NOT NULL DEFAULT 'manual',
         run_status VARCHAR(20) NOT NULL DEFAULT 'running',
         dry_run BOOLEAN NOT NULL DEFAULT FALSE,
-        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        finished_at TIMESTAMPTZ,
+        started_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        finished_at TIMESTAMP,
         duration_ms INTEGER,
         metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
         error_message TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
         CONSTRAINT batch_job_runs_status_check
           CHECK (run_status IN ('running', 'success', 'failed', 'skipped'))
       );

@@ -14,27 +14,27 @@ const countQueries = {
   expiredPendingRegistrations: `
     SELECT COUNT(*)::INT AS count
     FROM pending_registrations
-    WHERE expires_at <= NOW()
+    WHERE expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
   `,
   expiredPendingEmailChanges: `
     SELECT COUNT(*)::INT AS count
     FROM pending_email_changes
-    WHERE expires_at <= NOW()
+    WHERE expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
   `,
   expiredOrUsedPasswordResetTokens: `
     SELECT COUNT(*)::INT AS count
     FROM password_reset_tokens
-    WHERE expires_at <= NOW() OR used_at IS NOT NULL
+    WHERE expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') OR used_at IS NOT NULL
   `,
   inactiveAuthSessions: `
     SELECT COUNT(*)::INT AS count
     FROM auth_sessions
-    WHERE last_active_at <= NOW() - INTERVAL '30 days'
+    WHERE last_active_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '30 days'
   `,
   oldAppLogs: `
     SELECT COUNT(*)::INT AS count
     FROM app_logs
-    WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+    WHERE created_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
   `,
 };
 
@@ -58,30 +58,30 @@ async function getDryRunCounts(client) {
 async function runCleanup(client) {
   const expiredPendingRegistrations = await client.query(`
     DELETE FROM pending_registrations
-    WHERE expires_at <= NOW()
+    WHERE expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
   `);
 
   const expiredPendingEmailChanges = await client.query(`
     DELETE FROM pending_email_changes
-    WHERE expires_at <= NOW()
+    WHERE expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
   `);
 
   const expiredOrUsedPasswordResetTokens = await client.query(`
     DELETE FROM password_reset_tokens
-    WHERE expires_at <= NOW() OR used_at IS NOT NULL
+    WHERE expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') OR used_at IS NOT NULL
   `);
 
   const inactiveAuthSessions = await client.query(
     `
       DELETE FROM auth_sessions
-      WHERE last_active_at <= NOW() - INTERVAL '30 days'
+      WHERE last_active_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '30 days'
     `,
   );
 
   const oldAppLogs = await client.query(
     `
       DELETE FROM app_logs
-      WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+      WHERE created_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
     `,
     [appLogRetentionDays],
   );

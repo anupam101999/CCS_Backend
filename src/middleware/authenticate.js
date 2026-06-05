@@ -35,12 +35,12 @@ async function authenticate(req, res, next) {
   try {
     const { rows } = await pool.query(
       `UPDATE auth_sessions s
-       SET last_active_at = NOW()
+       SET last_active_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        FROM users u
        WHERE s.session_id = $1
          AND s.user_id = $2
          AND u.id = s.user_id
-         AND s.last_active_at > NOW() - ($3 || ' days')::INTERVAL
+         AND s.last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($3 || ' days')::INTERVAL
        RETURNING s.session_id, s.user_id, u.email, u.is_admin, u.is_manager`,
       [payload.sid, payload.sub, SESSION_INACTIVITY_DAYS],
     );

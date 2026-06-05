@@ -33,7 +33,7 @@ const confirmedAppointments = async (req, res) => {
     const { rows } = await pool.query(
       `SELECT *
        FROM appointment_bookings
-       WHERE user_id = $1 and status = 'confirmed' AND appointment_date >= CURRENT_DATE
+       WHERE user_id = $1 and status = 'confirmed' AND appointment_date >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date)
        ORDER BY appointment_date DESC`,
       [userId],
     );
@@ -246,7 +246,7 @@ const updateAppointment = async (req, res) => {
              appointment_time = COALESCE($7, appointment_time),
              photo_urls = COALESCE($8, photo_urls),
              status = CASE WHEN status = 'confirmed' THEN 'pending' ELSE status END,
-             updated_at = NOW()
+             updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
          WHERE booking_id = $9
            AND user_id = $10
          RETURNING *`,
@@ -283,7 +283,7 @@ const updateAppointment = async (req, res) => {
                read_at = NULL,
                home_dismissed_at = NULL,
                updates_cleared_at = NULL,
-               updated_at = NOW()
+               updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
            WHERE ticket_id = $7`,
           [
             appointment.category,
@@ -430,7 +430,7 @@ const rescheduleAppointment = async (req, res) => {
              status = 'pending',
              notification_ticket_id = $10,
              photo_urls = COALESCE($11, photo_urls),
-             updated_at = NOW()
+             updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
          WHERE booking_id = $1 AND user_id = $2
          RETURNING *`,
         [
