@@ -8,6 +8,22 @@ const {
   toJsonb,
 } = require("./customerUtils");
 
+const MAX_APPOINTMENT_SUBJECT_CHARS = 120;
+const MAX_APPOINTMENT_TEXT_CHARS = 2000;
+
+function validateAppointmentText({ subject, query, address }) {
+  if (typeof subject === "string" && subject.length > MAX_APPOINTMENT_SUBJECT_CHARS) {
+    return `Subject must not exceed ${MAX_APPOINTMENT_SUBJECT_CHARS} characters.`;
+  }
+  if (typeof query === "string" && query.length > MAX_APPOINTMENT_TEXT_CHARS) {
+    return `Query / notes must not exceed ${MAX_APPOINTMENT_TEXT_CHARS} characters.`;
+  }
+  if (typeof address === "string" && address.length > MAX_APPOINTMENT_TEXT_CHARS) {
+    return `Appointment address must not exceed ${MAX_APPOINTMENT_TEXT_CHARS} characters.`;
+  }
+  return "";
+}
+
 const confirmedAppointments = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -73,6 +89,16 @@ const bookAppointment = async (req, res) => {
       ? req.body.photo_urls.filter(Boolean)
       : [];
     const trimmedAddress = String(appointmentAddress || address || "").trim();
+    const textError = validateAppointmentText({
+      subject,
+      query,
+      address: trimmedAddress,
+    });
+
+    if (textError) {
+      logger.warn("appointments.book_rejected", { userId, reason: "text_too_long" });
+      return res.status(400).json({ message: textError });
+    }
 
     if (photoUrls.length > 5) {
       logger.warn("appointments.book_rejected", { userId, reason: "too_many_photos" });
@@ -174,6 +200,16 @@ const updateAppointment = async (req, res) => {
         : typeof address === "string"
         ? address.trim()
           : undefined;
+    const textError = validateAppointmentText({
+      subject,
+      query,
+      address: nextAddress,
+    });
+
+    if (textError) {
+      logger.warn("appointments.update_rejected", { userId, bookingId, reason: "text_too_long" });
+      return res.status(400).json({ message: textError });
+    }
 
     if (photoUrls && photoUrls.length > 5) {
       logger.warn("appointments.update_rejected", { userId, bookingId, reason: "too_many_photos" });
@@ -294,6 +330,16 @@ const rescheduleAppointment = async (req, res) => {
         : typeof address === "string"
         ? address.trim()
           : undefined;
+    const textError = validateAppointmentText({
+      subject,
+      query,
+      address: nextAddress,
+    });
+
+    if (textError) {
+      logger.warn("appointments.reschedule_rejected", { userId, bookingId, reason: "text_too_long" });
+      return res.status(400).json({ message: textError });
+    }
 
     if (photoUrls && photoUrls.length > 5) {
       logger.warn("appointments.reschedule_rejected", { userId, bookingId, reason: "too_many_photos" });
