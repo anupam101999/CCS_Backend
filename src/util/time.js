@@ -1,4 +1,4 @@
-const DEFAULT_TIME_ZONE = process.env.APP_TIME_ZONE || "Asia/Kolkata";
+const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 const DEFAULT_LOCALE = "en-IN";
 
 if (!process.env.TZ) {
@@ -6,7 +6,7 @@ if (!process.env.TZ) {
 }
 
 function getTimeZone() {
-  return process.env.APP_TIME_ZONE || DEFAULT_TIME_ZONE;
+  return DEFAULT_TIME_ZONE;
 }
 
 function getOffset(date, timeZone) {

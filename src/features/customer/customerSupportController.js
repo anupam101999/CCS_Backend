@@ -7,6 +7,16 @@ const {
   normalizePhotoUrls,
   toJsonb,
 } = require("./customerUtils");
+const {
+  TICKET_RETURNING_FIELDS,
+  buildTicketListFilter,
+  buildHomeNotificationFilter,
+  countTickets,
+  listTickets,
+  findTicketForMessage,
+  insertTicketMessage,
+  makeTicketVisibleInUpdates,
+} = require("./customerSupportQueries");
 
 const supportTicket = async (req, res) => {
   try {
@@ -80,10 +90,7 @@ const updateTicket = async (req, res) => {
        WHERE ticket_id = $5
          AND user_id = $6
          AND COALESCE(type, '') <> 'Appointment'
-       RETURNING ticket_id, user_id, category, subject, query, reply, type, status,
-                 is_visible_in_updates, is_visible_in_home, is_read, read_at,
-                 home_dismissed_at, updates_cleared_at, photo_urls,
-                 created_at, updated_at`,
+       RETURNING ${TICKET_RETURNING_FIELDS}`,
       [
         typeof category === "string" ? category.trim() : null,
         typeof subject === "string" ? subject.trim() : null,
@@ -134,20 +141,11 @@ const addTicketMessage = async (req, res) => {
     }
 
     const ticket = await pool.withTransaction(async (client) => {
-      const { rows } = await client.query(
-        `SELECT ticket_id, user_id, category, subject, query, reply, type, status,
-                is_visible_in_updates, is_visible_in_home, is_read, read_at,
-                home_dismissed_at, updates_cleared_at, photo_urls,
-                created_at, updated_at
-         FROM notification_tickets
-         WHERE ticket_id = $1
-           AND ($2::BOOLEAN OR user_id = $3)
-           AND COALESCE(type, '') <> 'Appointment'
-         FOR UPDATE`,
-        [ticketId, isAdmin, userId],
-      );
-
-      const current = rows[0];
+      const current = await findTicketForMessage(client, {
+        ticketId,
+        isAdmin,
+        userId,
+      });
       if (!current) return null;
       if (!isAdmin && String(current.status).toLowerCase() !== "in-progress") {
         const err = new Error("New messages can only be added while the ticket is in progress.");
@@ -155,24 +153,13 @@ const addTicketMessage = async (req, res) => {
         throw err;
       }
 
-      await client.query(
-        `INSERT INTO notification_ticket_messages
-          (ticket_id, author_user_id, author_role, message_body)
-         VALUES ($1, $2, $3, $4)`,
-        [ticketId, userId, isAdmin ? "admin" : "customer", messageBody],
-      );
-      const { rows: updated } = await client.query(
-        `UPDATE notification_tickets
-         SET is_visible_in_updates = TRUE,
-             updated_at = NOW()
-         WHERE ticket_id = $1
-         RETURNING ticket_id, user_id, category, subject, query, reply, type, status,
-                   is_visible_in_updates, is_visible_in_home, is_read, read_at,
-                   home_dismissed_at, updates_cleared_at, photo_urls,
-                   created_at, updated_at`,
-        [ticketId],
-      );
-      return updated[0];
+      await insertTicketMessage(client, {
+        ticketId,
+        userId,
+        authorRole: isAdmin ? "admin" : "customer",
+        messageBody,
+      });
+      return makeTicketVisibleInUpdates(client, ticketId);
     });
 
     if (!ticket) {
@@ -211,68 +198,20 @@ const getMyTickets = async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
     const offset = (page - 1) * limit;
-    const values = [userId];
-    const filters = [
-      "nt.user_id = $1",
-      "nt.is_visible_in_updates = TRUE",
-    ];
-
-    if (search) {
-      values.push(`%${search}%`);
-      filters.push(
-        `(nt.ticket_id ILIKE $${values.length} OR nt.category ILIKE $${values.length} OR nt.subject ILIKE $${values.length} OR nt.query ILIKE $${values.length} OR COALESCE(nt.reply, '') ILIKE $${values.length} OR COALESCE(nt.type, '') ILIKE $${values.length} OR nt.status ILIKE $${values.length} OR EXISTS (
-          SELECT 1
-          FROM notification_ticket_messages ntm
-          WHERE ntm.ticket_id = nt.ticket_id
-            AND ntm.is_internal = FALSE
-            AND ntm.message_body ILIKE $${values.length}
-        ))`,
-      );
-    }
-
-    if (type && type !== "all") {
-      values.push(type);
-      filters.push(`COALESCE(nt.type, '') = $${values.length}`);
-    }
-
     if (read && read !== "all") {
       if (!["read", "unread"].includes(read)) {
         return res.status(400).json({ message: "Invalid read filter." });
       }
-      values.push(read === "read");
-      filters.push(`nt.is_read = $${values.length}`);
     }
 
-    const whereClause = `WHERE ${filters.join(" AND ")}`;
-
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*)::INT AS total,
-              COUNT(*) FILTER (WHERE nt.is_read = FALSE)::INT AS unread_total
-       FROM notification_tickets nt
-       ${whereClause}`,
-      values,
-    );
-
-    const listValues = [...values, limit, offset];
-    const { rows } = await pool.query(
-      `SELECT nt.ticket_id, nt.user_id, nt.category, nt.subject, nt.query,
-              nt.reply, nt.type, nt.status, nt.is_visible_in_updates,
-              nt.is_visible_in_home, nt.is_read, nt.read_at,
-              nt.home_dismissed_at, nt.updates_cleared_at,
-              nt.photo_urls, nt.created_at, nt.updated_at,
-              ab.booking_id, ab.appointment_type, ab.appointment_address
-       FROM notification_tickets nt
-       LEFT JOIN appointment_bookings ab
-         ON ab.notification_ticket_id = nt.ticket_id
-       ${whereClause}
-       ORDER BY nt.updated_at DESC
-       LIMIT $${listValues.length - 1}
-       OFFSET $${listValues.length}`,
-      listValues,
-    );
-
-    const total = countRows[0]?.total || 0;
-    const unreadTotal = countRows[0]?.unread_total || 0;
+    const { whereClause, values } = buildTicketListFilter({
+      userId,
+      search,
+      type,
+      read,
+    });
+    const { total, unreadTotal } = await countTickets(pool, whereClause, values);
+    const rows = await listTickets(pool, whereClause, values, limit, offset);
 
     logger.info("tickets.listed", {
       userId,
@@ -310,37 +249,17 @@ const getHomeNotifications = async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20);
     const offset = (page - 1) * limit;
 
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*)::INT AS total
-       FROM notification_tickets
-       WHERE user_id = $1
-         AND is_visible_in_updates = TRUE
-         AND is_visible_in_home = TRUE
-         AND is_read = FALSE`,
-      [userId],
-    );
+    const { whereClause, values } = buildHomeNotificationFilter(userId);
+    const { total: count } = await countTickets(pool, whereClause, values);
+    const rows = await listTickets(pool, whereClause, values, limit, offset);
 
-    const { rows } = await pool.query(
-      `SELECT nt.ticket_id, nt.user_id, nt.category, nt.subject, nt.query,
-              nt.reply, nt.type, nt.status, nt.is_visible_in_updates,
-              nt.is_visible_in_home, nt.is_read, nt.read_at,
-              nt.home_dismissed_at, nt.updates_cleared_at, nt.photo_urls,
-              nt.created_at, nt.updated_at, ab.booking_id,
-              ab.appointment_type, ab.appointment_address
-       FROM notification_tickets nt
-       LEFT JOIN appointment_bookings ab
-         ON ab.notification_ticket_id = nt.ticket_id
-       WHERE nt.user_id = $1
-         AND nt.is_visible_in_updates = TRUE
-         AND nt.is_visible_in_home = TRUE
-         AND nt.is_read = FALSE
-       ORDER BY nt.updated_at DESC
-       LIMIT $2
-       OFFSET $3`,
-      [userId, limit, offset],
-    );
-
-    const count = countRows[0]?.total || 0;
+    logger.info("notifications.home_listed", {
+      userId,
+      page,
+      limit,
+      resultCount: rows.length,
+      total: count,
+    });
 
     return res.json({
       count,

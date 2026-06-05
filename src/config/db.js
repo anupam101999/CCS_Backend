@@ -1,6 +1,28 @@
 require("./env");
-const { Pool } = require("pg");
-const { getTimeZone } = require("../util/time");
+const { Pool, types } = require("pg");
+const { getTimeZone, localTimestamp } = require("../util/time");
+
+const PG_TYPE_DATE = 1082;
+const PG_TYPE_TIMESTAMP = 1114;
+const PG_TYPE_TIMESTAMPTZ = 1184;
+
+function parseDate(value) {
+  return value || null;
+}
+
+function parseTimestamp(value) {
+  if (!value) return null;
+  const normalized = String(value).replace(" ", "T");
+  const withOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized)
+    ? normalized
+    : `${normalized}+05:30`;
+  const parsed = new Date(withOffset);
+  return Number.isNaN(parsed.getTime()) ? value : localTimestamp(parsed);
+}
+
+types.setTypeParser(PG_TYPE_DATE, parseDate);
+types.setTypeParser(PG_TYPE_TIMESTAMP, parseTimestamp);
+types.setTypeParser(PG_TYPE_TIMESTAMPTZ, parseTimestamp);
 
 function readNumber(name, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   const value = Number(process.env[name]);

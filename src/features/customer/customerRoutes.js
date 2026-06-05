@@ -37,7 +37,7 @@ const {
   verificationLimiter,
 } = require("../../middleware/authRateLimits");
 
-// ── Public ─────────────────────────────────────────────────────────
+// Public
 userRoute.post("/register", verificationLimiter, register);
 userRoute.post("/register/verify-email", verificationLimiter, verifyRegistrationEmail);
 userRoute.post("/login", loginLimiter, login);
@@ -46,7 +46,7 @@ userRoute.post("/reset-password", passwordResetLimiter, resetPassword);
 userRoute.post("/signout", requireTrustedOrigin, signOut);
 userRoute.post("/token-refresh", requireTrustedOrigin, refreshLimiter, tokenRefresh);
 
-// ── Protected ──────────────────────────────────────────────────────
+// Protected
 userRoute.put("/update", requireSession, update);
 userRoute.post("/email-change/request", requireSession, requestEmailChange);
 userRoute.post("/email-change/verify", requireSession, verifyEmailChange);

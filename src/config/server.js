@@ -70,11 +70,8 @@ app.use("/api", uploadRoutes);
 app.use("/api", projectRoutes);
 app.use("/api/debug", requireAdmin, require("../services/mailerTest").router);
 
-let transporter = null;
-let configLogged = false;
-
 app.get("/", (_req, res) =>
-  res.json({ status: "✅ online", app: "CCS Backend", version: "3.1.0" }),
+  res.json({ status: "online", app: "CCS Backend", version: "3.1.0" }),
 );
 
 app.get("/health", (_req, res) =>
