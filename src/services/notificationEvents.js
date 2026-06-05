@@ -1,4 +1,5 @@
 const logger = require("../util/logger");
+const pool = require("../config/db");
 
 const clientsByUserId = new Map();
 
@@ -75,8 +76,42 @@ function sendNotificationToUser(userId, payload = {}) {
   return clientCount;
 }
 
+async function sendNotificationToStaff(payload = {}) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id
+       FROM users
+       WHERE is_admin = TRUE OR is_manager = TRUE`,
+    );
+
+    let deliveredClients = 0;
+    rows.forEach((staff) => {
+      deliveredClients += sendNotificationToUser(staff.id, {
+        audience: "staff",
+        ...payload,
+      });
+    });
+
+    logger.info("notifications.staff_sent", {
+      staffCount: rows.length,
+      deliveredClients,
+      type: payload.type || "notification.updated",
+      ticketId: payload.ticketId,
+    });
+
+    return deliveredClients;
+  } catch (err) {
+    logger.error("notifications.staff_send_failed", err, {
+      type: payload.type || "notification.updated",
+      ticketId: payload.ticketId,
+    });
+    return 0;
+  }
+}
+
 module.exports = {
   addNotificationClient,
+  sendNotificationToStaff,
   sendNotificationToUser,
   sendToUser,
 };

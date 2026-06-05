@@ -40,7 +40,7 @@ function addSearchFilter(filters, values, search) {
   );
 }
 
-function buildTicketListFilter({ userId, search, type, read }) {
+function buildTicketListFilter({ userId, search, type, read, ticketId }) {
   const values = [userId];
   const filters = [
     "nt.user_id = $1",
@@ -48,6 +48,11 @@ function buildTicketListFilter({ userId, search, type, read }) {
   ];
 
   addSearchFilter(filters, values, search);
+
+  if (ticketId) {
+    values.push(ticketId);
+    filters.push(`nt.ticket_id = $${values.length}`);
+  }
 
   if (type && type !== "all") {
     values.push(type);

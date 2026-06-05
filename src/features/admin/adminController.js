@@ -130,6 +130,7 @@ const getAllAppointments = async (req, res) => {
   try {
     const status = String(req.query.status || "").trim().toLowerCase();
     const user = String(req.query.user || req.query.q || "").trim();
+    const ticketId = String(req.query.ticketId || "").trim();
     const { page, limit, offset } = getPagination(req.query);
     const validStatuses = ["pending", "confirmed", "cancelled", "completed"];
     const filters = [];
@@ -157,6 +158,11 @@ const getAllAppointments = async (req, res) => {
           `(u.full_name ILIKE $${searchIndex} OR u.email ILIKE $${searchIndex} OR u.phone ILIKE $${searchIndex})`,
         );
       }
+    }
+
+    if (ticketId) {
+      values.push(ticketId);
+      filters.push(`nt.ticket_id = $${values.length}`);
     }
 
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
@@ -799,13 +805,16 @@ const updateTicket = async (req, res) => {
       hasReply: Boolean(trimmedReply),
     });
     sendNotificationToUser(rows[0].user_id, {
-      title: trimmedReply ? "Admin replied" : "Ticket updated",
+      title: trimmedReply ? "Team replied" : "Ticket updated",
       message: trimmedReply
-        ? "Admin replied to your ticket."
-        : `Your ticket status is now ${rows[0].status}.`,
+        ? `TCK${ticketId} - ${rows[0].subject}`
+        : `TCK${ticketId} is now ${rows[0].status}.`,
       type: trimmedReply ? "ticket.reply_added" : "ticket.status_changed",
       ticketId,
+      subject: rows[0].subject,
+      replyPreview: trimmedReply || rows[0].reply,
       status: rows[0].status,
+      targetPath: `/notifications?ticketId=${ticketId}`,
     });
     return res.json({ ticket });
   } catch (err) {

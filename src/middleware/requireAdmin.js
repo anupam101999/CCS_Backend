@@ -17,8 +17,11 @@ function requireAdmin(req, res, next) {
       const canSearchCustomers =
         ["GET", "HEAD", "OPTIONS"].includes(req.method) &&
         path === "/api/admin/users";
+      const canViewTickets =
+        ["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+        path === "/api/admin/tickets";
 
-      if (canSearchCustomers) {
+      if (canSearchCustomers || canViewTickets) {
         req.adminId = req.user.id;
         return next();
       }

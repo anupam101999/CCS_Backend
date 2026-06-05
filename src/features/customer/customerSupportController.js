@@ -1,6 +1,9 @@
 const pool = require("../../config/db");
 const logger = require("../../util/logger");
-const { sendNotificationToUser } = require("../../services/notificationEvents");
+const {
+  sendNotificationToStaff,
+  sendNotificationToUser,
+} = require("../../services/notificationEvents");
 const {
   getAuthedUserId,
   ensureOwnUser,
@@ -53,9 +56,21 @@ const supportTicket = async (req, res) => {
     logger.info("ticket.created", { userId, ticketId: ticket.ticket_id });
     sendNotificationToUser(userId, {
       title: "Ticket created",
-      message: "Your support ticket has been created.",
+      message: `Ticket TCK${ticket.ticket_id}: ${ticket.subject}`,
       type: "ticket.created",
       ticketId: ticket.ticket_id,
+      subject: ticket.subject,
+      messagePreview: ticket.query,
+      targetPath: `/notifications?ticketId=${ticket.ticket_id}`,
+    });
+    sendNotificationToStaff({
+      title: "New customer ticket",
+      message: `TCK${ticket.ticket_id} - ${ticket.subject}`,
+      type: "ticket.created",
+      ticketId: ticket.ticket_id,
+      subject: ticket.subject,
+      messagePreview: ticket.query,
+      targetPath: `/admin/tickets?ticketId=${ticket.ticket_id}`,
     });
 
     return res.status(201).json({
@@ -117,9 +132,21 @@ const updateTicket = async (req, res) => {
     const [ticket] = await attachTicketMessages(rows);
     sendNotificationToUser(userId, {
       title: "Ticket updated",
-      message: "Your ticket details were updated.",
+      message: `Ticket TCK${ticketId}: ${rows[0].subject}`,
       type: "ticket.updated",
       ticketId,
+      subject: rows[0].subject,
+      messagePreview: rows[0].query,
+      targetPath: `/notifications?ticketId=${ticketId}`,
+    });
+    sendNotificationToStaff({
+      title: "Ticket details updated",
+      message: `TCK${ticketId} - ${rows[0].subject}`,
+      type: "ticket.updated",
+      ticketId,
+      subject: rows[0].subject,
+      messagePreview: rows[0].query,
+      targetPath: `/admin/tickets?ticketId=${ticketId}`,
     });
     return res.json({ ticket });
   } catch (err) {
@@ -185,14 +212,27 @@ const addTicketMessage = async (req, res) => {
       ticketId,
       authorRole: isAdmin ? "admin" : "customer",
     });
-    sendNotificationToUser(ticket.user_id, {
-      title: isAdmin ? "Admin replied" : "Message added",
-      message: isAdmin
-        ? "Admin replied to your ticket."
-        : "Your message was added to the ticket.",
-      type: "ticket.message_added",
-      ticketId,
-    });
+    if (isAdmin) {
+      sendNotificationToUser(ticket.user_id, {
+        title: "Team replied",
+        message: `TCK${ticketId} - ${ticket.subject}`,
+        type: "ticket.reply_added",
+        ticketId,
+        subject: ticket.subject,
+        replyPreview: messageBody,
+        targetPath: `/notifications?ticketId=${ticketId}`,
+      });
+    } else {
+      sendNotificationToStaff({
+        title: "Customer replied",
+        message: `TCK${ticketId} - ${ticket.subject}`,
+        type: "ticket.customer_reply_added",
+        ticketId,
+        subject: ticket.subject,
+        messagePreview: messageBody,
+        targetPath: `/admin/tickets?ticketId=${ticketId}`,
+      });
+    }
     return res.status(201).json({ ticket: ticketWithMessages });
   } catch (err) {
     if (err?.code === "TICKET_CHAT_CLOSED") {
@@ -216,6 +256,7 @@ const getMyTickets = async (req, res) => {
     const search = String(req.query.q || "").trim();
     const type = String(req.query.type || "").trim();
     const read = String(req.query.read || "all").trim().toLowerCase();
+    const ticketId = String(req.query.ticketId || "").trim();
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
     const offset = (page - 1) * limit;
@@ -230,6 +271,7 @@ const getMyTickets = async (req, res) => {
       search,
       type,
       read,
+      ticketId,
     });
     const { total, unreadTotal } = await countTickets(pool, whereClause, values);
     const rows = await listTickets(pool, whereClause, values, limit, offset);
