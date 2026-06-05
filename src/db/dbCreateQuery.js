@@ -20,6 +20,7 @@ async function dbCreateQuery() {
         dob DATE,
         address TEXT,
         avatarurl TEXT,
+        is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
         is_admin BOOLEAN NOT NULL DEFAULT FALSE,
         is_manager BOOLEAN NOT NULL DEFAULT FALSE,
         password VARCHAR(255) NOT NULL,
@@ -121,6 +122,11 @@ async function dbCreateQuery() {
     await client.query(`
       ALTER TABLE appointment_bookings
       ADD COLUMN IF NOT EXISTS notification_ticket_id VARCHAR(14);
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE;
     `);
 
     await client.query(`

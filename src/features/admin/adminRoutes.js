@@ -3,6 +3,7 @@ const { requireAdmin } = require("../../middleware/requireAdmin");
 const {
   getStats,
   getAllUsers,
+  updateUserRole,
   getAllAppointments,
   updateAppointment,
   updateAppointmentStatus,
@@ -17,6 +18,7 @@ const {
 
 adminRoutes.get("/stats",                          requireAdmin, getStats);
 adminRoutes.get("/users",                          requireAdmin, getAllUsers);
+adminRoutes.put("/users/:userId/role",             requireAdmin, updateUserRole);
 adminRoutes.get("/appointments",                   requireAdmin, getAllAppointments);
 adminRoutes.put("/appointments/:bookingId",        requireAdmin, updateAppointment);
 adminRoutes.put("/appointments/:bookingId/status", requireAdmin, updateAppointmentStatus);

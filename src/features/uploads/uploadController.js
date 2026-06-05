@@ -235,7 +235,7 @@ const uploadProjectPhoto = async (req, res) => {
       return res.status(400).json({ message: "projectName is required." });
     }
     const userExists = await pool.query(
-      `SELECT id FROM users WHERE id = $1 AND is_admin = FALSE AND is_manager = FALSE LIMIT 1`,
+      `SELECT id FROM users WHERE id = $1 AND is_superadmin = FALSE AND is_admin = FALSE AND is_manager = FALSE LIMIT 1`,
       [userId],
     );
 

@@ -156,7 +156,7 @@ const verifyRegistrationEmail = async (req, res) => {
     const { rows: inserted } = await client.query(
       `INSERT INTO users (full_name, email, phone, dob, address, password, avatarurl)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, full_name, email, phone, dob, address, is_admin, is_manager, avatarurl`,
+       RETURNING id, full_name, email, phone, dob, address, is_superadmin, is_admin, is_manager, avatarurl`,
       [
         pending.full_name,
         pending.email,
@@ -215,7 +215,7 @@ const login = async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT id, full_name, email, phone, dob, address, password, is_admin, is_manager, avatarurl
+      `SELECT id, full_name, email, phone, dob, address, password, is_superadmin, is_admin, is_manager, avatarurl
        FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [normalizedEmail],
     );
@@ -244,7 +244,8 @@ const login = async (req, res) => {
     logger.info("auth.login_success", {
       userId: user.id,
       is_admin: user.is_admin === true,
-      is_manager: user.is_admin !== true && user.is_manager === true,
+      is_manager: user.is_superadmin !== true && user.is_admin !== true && user.is_manager === true,
+      is_superadmin: user.is_superadmin === true,
     });
     return res.json({
       accessToken: auth.accessToken,

@@ -81,7 +81,7 @@ async function sendNotificationToStaff(payload = {}) {
     const { rows } = await pool.query(
       `SELECT id
        FROM users
-       WHERE is_admin = TRUE OR is_manager = TRUE`,
+       WHERE is_superadmin = TRUE OR is_admin = TRUE OR is_manager = TRUE`,
     );
 
     let deliveredClients = 0;

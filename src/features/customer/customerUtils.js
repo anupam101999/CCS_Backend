@@ -79,7 +79,8 @@ function generateVerificationCode() {
 }
 
 function mapUser(user) {
-  const isAdmin = user.is_admin === true;
+  const isSuperadmin = user.is_superadmin === true;
+  const isAdmin = !isSuperadmin && user.is_admin === true;
   return {
     id: user.id,
     fullName: user.full_name,
@@ -87,8 +88,9 @@ function mapUser(user) {
     phone: user.phone || "",
     dob: formatDateOnly(user.dob),
     address: user.address || "",
+    is_superadmin: isSuperadmin,
     is_admin: isAdmin,
-    is_manager: !isAdmin && user.is_manager === true,
+    is_manager: !isSuperadmin && !isAdmin && user.is_manager === true,
     avatarurl: user.avatarurl || "",
   };
 }
@@ -227,14 +229,17 @@ async function deliverPasswordResetLink(email, resetUrl) {
 }
 
 function getAuthedUserId(req) {
-  if ((req.user?.is_admin || req.user?.is_manager) && req.headers["x-view-as-user-id"]) {
+  if (
+    (req.user?.is_superadmin || req.user?.is_admin || req.user?.is_manager) &&
+    req.headers["x-view-as-user-id"]
+  ) {
     return req.headers["x-view-as-user-id"];
   }
   return req.user?.id;
 }
 
 function ensureOwnUser(req, res, userId) {
-  if (req.user?.is_admin || req.user?.is_manager) return true;
+  if (req.user?.is_superadmin || req.user?.is_admin || req.user?.is_manager) return true;
 
   const authedUserId = getAuthedUserId(req);
   if (!authedUserId || String(authedUserId) !== String(userId)) {

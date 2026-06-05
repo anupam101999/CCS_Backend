@@ -41,7 +41,7 @@ async function authenticate(req, res, next) {
          AND s.user_id = $2
          AND u.id = s.user_id
          AND s.last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($3 || ' days')::INTERVAL
-       RETURNING s.session_id, s.user_id, u.email, u.is_admin, u.is_manager`,
+       RETURNING s.session_id, s.user_id, u.email, u.is_superadmin, u.is_admin, u.is_manager`,
       [payload.sid, payload.sub, SESSION_INACTIVITY_DAYS],
     );
     const session = rows[0];
@@ -53,14 +53,16 @@ async function authenticate(req, res, next) {
       });
     }
 
-    const isAdmin = session.is_admin === true;
+    const isSuperadmin = session.is_superadmin === true;
+    const isAdmin = !isSuperadmin && session.is_admin === true;
     req.sessionId = session.session_id;
     req.auth = payload;
     req.user = {
       id: session.user_id,
       email: session.email,
+      is_superadmin: isSuperadmin,
       is_admin: isAdmin,
-      is_manager: !isAdmin && session.is_manager === true,
+      is_manager: !isSuperadmin && !isAdmin && session.is_manager === true,
     };
     return next();
   } catch (err) {

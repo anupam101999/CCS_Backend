@@ -16,7 +16,12 @@ const getProjectsByUserId = async (req, res) => {
         message: "userId is required.",
       });
     }
-    if (!req.user?.is_admin && !req.user?.is_manager && String(req.user?.id) !== String(userId)) {
+    if (
+      !req.user?.is_superadmin &&
+      !req.user?.is_admin &&
+      !req.user?.is_manager &&
+      String(req.user?.id) !== String(userId)
+    ) {
       logger.warn("projects.list_denied", {
         requesterId: req.user?.id,
         requestedUserId: userId,

@@ -168,7 +168,7 @@ const addTicketMessage = async (req, res) => {
         message: "Manager access is read-only.",
       });
     }
-    const isAdmin = req.user?.is_admin === true;
+    const isAdmin = req.user?.is_superadmin === true || req.user?.is_admin === true;
     const userId = req.user?.id;
     const { ticketId } = req.params;
     const messageBody = String(req.body?.message || "").trim();
@@ -445,7 +445,7 @@ const deleteTicketPhoto = async (req, res) => {
 
     const ticket = rows[0];
     if (!ticket) return res.status(404).json({ message: "Ticket not found." });
-    if (!req.user?.is_admin && !req.user?.is_manager && String(ticket.user_id) !== String(userId)) return res.status(403).json({ message: "You can only remove your own ticket photos." });
+    if (!req.user?.is_superadmin && !req.user?.is_admin && !req.user?.is_manager && String(ticket.user_id) !== String(userId)) return res.status(403).json({ message: "You can only remove your own ticket photos." });
 
     const nextUrls = (ticket.photo_urls || []).filter((url) => url !== photoUrl);
 
@@ -481,7 +481,7 @@ const deleteAppointmentPhoto = async (req, res) => {
 
     const appointment = rows[0];
     if (!appointment) return res.status(404).json({ message: "Appointment not found." });
-    if (!req.user?.is_admin && !req.user?.is_manager && String(appointment.user_id) !== String(userId)) {
+    if (!req.user?.is_superadmin && !req.user?.is_admin && !req.user?.is_manager && String(appointment.user_id) !== String(userId)) {
       return res.status(403).json({ message: "You can only remove your own appointment photos." });
     }
 

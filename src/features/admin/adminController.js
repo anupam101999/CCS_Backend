@@ -84,9 +84,9 @@ const getStats = async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE) AS "totalUsers",
-        (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE AND created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '7 days') AS "newCustomers7Days",
-        (SELECT COUNT(*)::INT FROM users WHERE is_admin = FALSE AND is_manager = FALSE AND avatarurl IS NOT NULL AND avatarurl <> '') AS "customersWithAvatar",
+        (SELECT COUNT(*)::INT FROM users WHERE is_superadmin = FALSE AND is_admin = FALSE AND is_manager = FALSE) AS "totalUsers",
+        (SELECT COUNT(*)::INT FROM users WHERE is_superadmin = FALSE AND is_admin = FALSE AND is_manager = FALSE AND created_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '7 days') AS "newCustomers7Days",
+        (SELECT COUNT(*)::INT FROM users WHERE is_superadmin = FALSE AND is_admin = FALSE AND is_manager = FALSE AND avatarurl IS NOT NULL AND avatarurl <> '') AS "customersWithAvatar",
         (SELECT COUNT(DISTINCT user_id)::INT FROM auth_sessions WHERE last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '30 days') AS "activeUsers",
         (SELECT COUNT(DISTINCT user_id)::INT FROM projects) AS "customersWithProjects",
         (SELECT COUNT(*)::INT FROM projects) AS "projectPhotos",
@@ -213,10 +213,10 @@ const getAllUsers = async (req, res) => {
     const isNumericId = /^\d+$/.test(q);
     const search = `%${q}%`;
     const { rows } = await pool.query(
-      `SELECT id, full_name, email, phone, dob, address, avatarurl
+      `SELECT id, full_name, email, phone, dob, address, avatarurl,
+              is_superadmin, is_admin, is_manager
        FROM users
-       WHERE is_admin = FALSE
-         AND is_manager = FALSE
+       WHERE ${req.user?.is_superadmin ? "TRUE" : "is_superadmin = FALSE AND is_admin = FALSE AND is_manager = FALSE"}
          AND (
            ${isNumericId ? "id = $2 OR" : ""}
            full_name ILIKE $1
@@ -512,6 +512,63 @@ const getAllTickets = async (req, res) => {
     });
   } catch (err) {
     logger.error("admin.tickets_list_failed", err, { adminId: req.adminId });
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const updateUserRole = async (req, res) => {
+  try {
+    if (!req.user?.is_superadmin) {
+      logger.warn("admin.user_role_update_denied", {
+        adminId: req.adminId,
+        targetUserId: req.params.userId,
+      });
+      return res.status(403).json({
+        code: "SUPERADMIN_REQUIRED",
+        message: "Only superadmin can change user roles.",
+      });
+    }
+
+    const { userId } = req.params;
+    const role = String(req.body?.role || "").trim().toLowerCase();
+    const validRoles = ["user", "customer", "manager", "admin", "superadmin"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: "Invalid role." });
+    }
+
+    const nextRole = role === "customer" ? "user" : role;
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET is_superadmin = $1,
+           is_admin = $2,
+           is_manager = $3,
+           updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
+       WHERE id = $4
+       RETURNING id, full_name, email, phone, dob, address, avatarurl,
+                 is_superadmin, is_admin, is_manager`,
+      [
+        nextRole === "superadmin",
+        nextRole === "admin",
+        nextRole === "manager",
+        userId,
+      ],
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    logger.info("admin.user_role_updated", {
+      adminId: req.adminId,
+      targetUserId: userId,
+      role: nextRole,
+    });
+    return res.json({ user: rows[0] });
+  } catch (err) {
+    logger.error("admin.user_role_update_failed", err, {
+      adminId: req.adminId,
+      targetUserId: req.params.userId,
+    });
     return res.status(500).json({ message: "Internal server error." });
   }
 };
@@ -832,6 +889,7 @@ const updateTicket = async (req, res) => {
 module.exports = {
   getStats,
   getAllUsers,
+  updateUserRole,
   getAllAppointments,
   updateAppointment,
   updateAppointmentStatus,

@@ -159,7 +159,7 @@ const verifyEmailChange = async (req, res) => {
       `UPDATE users
        SET email = $1, updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE id = $2
-       RETURNING id, full_name, email, phone, dob, address, is_admin, is_manager, avatarurl`,
+       RETURNING id, full_name, email, phone, dob, address, is_superadmin, is_admin, is_manager, avatarurl`,
       [pending.new_email, userId],
     );
 

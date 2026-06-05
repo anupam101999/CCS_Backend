@@ -31,6 +31,7 @@ function hashToken(token) {
 }
 
 function roleFor(user) {
+  if (user.is_superadmin === true) return "superadmin";
   if (user.is_admin === true) return "admin";
   if (user.is_manager === true) return "manager";
   return "customer";
@@ -129,7 +130,7 @@ async function createAuthSession(client, user) {
 async function refreshAuthSession(refreshToken) {
   const payload = verifyRefreshToken(refreshToken);
   const { rows } = await pool.query(
-    `SELECT s.session_id, s.user_id, u.email, u.is_admin, u.is_manager
+    `SELECT s.session_id, s.user_id, u.email, u.is_superadmin, u.is_admin, u.is_manager
      FROM auth_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.session_id = $1
