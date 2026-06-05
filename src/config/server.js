@@ -9,6 +9,7 @@ const customerRoutes = require("../features/customer/customerRoutes");
 const adminRoutes = require("../features/admin/adminRoutes");
 const uploadRoutes = require("../features/uploads/uploadRoutes");
 const projectRoutes = require("../features/projects/projectRoutes");
+const notificationRoutes = require("../features/notifications/notificationRoutes");
 const logger = require("../util/logger");
 const {
   getTimeZone,
@@ -68,6 +69,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api", customerRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api", projectRoutes);
+app.use("/api", notificationRoutes);
 app.use("/api/debug", requireAdmin, require("../services/mailerTest").router);
 
 app.get("/", (_req, res) =>

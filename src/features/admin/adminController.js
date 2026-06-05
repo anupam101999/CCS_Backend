@@ -2,6 +2,7 @@ const pool = require("../../config/db");
 const logger = require("../../util/logger");
 const { formatDateOnly } = require("../../util/time");
 const { attachTicketMessages, toJsonb } = require("../customer/customerUtils");
+const { sendNotificationToUser } = require("../../services/notificationEvents");
 
 function formatAppointmentDate(date) {
   if (!date) return "the selected date";
@@ -355,6 +356,13 @@ const updateAppointment = async (req, res) => {
       bookingId,
       status: rows[0].status,
     });
+    sendNotificationToUser(rows[0].user_id, {
+      title: "Appointment updated",
+      message: "Your appointment details were updated.",
+      type: "appointment.updated",
+      ticketId: rows[0].notification_ticket_id,
+      bookingId,
+    });
     return res.json({ appointment: rows[0] });
   } catch (err) {
     await client?.query("ROLLBACK").catch(() => {});
@@ -411,6 +419,14 @@ const updateAppointmentStatus = async (req, res) => {
 
     logger.info("admin.appointment_status_updated", {
       adminId: req.adminId,
+      bookingId,
+      status,
+    });
+    sendNotificationToUser(rows[0].user_id, {
+      title: "Appointment status changed",
+      message: `Your appointment is now ${status}.`,
+      type: "appointment.status_changed",
+      ticketId: rows[0].notification_ticket_id,
       bookingId,
       status,
     });
@@ -781,6 +797,15 @@ const updateTicket = async (req, res) => {
       ticketId,
       status: rows[0].status,
       hasReply: Boolean(trimmedReply),
+    });
+    sendNotificationToUser(rows[0].user_id, {
+      title: trimmedReply ? "Admin replied" : "Ticket updated",
+      message: trimmedReply
+        ? "Admin replied to your ticket."
+        : `Your ticket status is now ${rows[0].status}.`,
+      type: trimmedReply ? "ticket.reply_added" : "ticket.status_changed",
+      ticketId,
+      status: rows[0].status,
     });
     return res.json({ ticket });
   } catch (err) {

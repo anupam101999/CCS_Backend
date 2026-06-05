@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const path = require("path");
 const pool = require("../../config/db");
 const logger = require("../../util/logger");
+const { sendNotificationToUser } = require("../../services/notificationEvents");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -299,6 +300,13 @@ const uploadProjectPhoto = async (req, res) => {
     logger.info("upload.project_photo_completed", {
       adminId: req.adminId,
       userId,
+      projectName,
+      count: uploadedProjects.length,
+    });
+    sendNotificationToUser(userId, {
+      title: "Project photos added",
+      message: `${uploadedProjects.length} new project photo${uploadedProjects.length === 1 ? "" : "s"} uploaded.`,
+      type: "project.photo_added",
       projectName,
       count: uploadedProjects.length,
     });

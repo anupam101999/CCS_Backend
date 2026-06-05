@@ -1,5 +1,6 @@
 const pool = require("../../config/db");
 const logger = require("../../util/logger");
+const { sendNotificationToUser } = require("../../services/notificationEvents");
 const {
   getAuthedUserId,
   ensureOwnUser,
@@ -50,6 +51,12 @@ const supportTicket = async (req, res) => {
     });
 
     logger.info("ticket.created", { userId, ticketId: ticket.ticket_id });
+    sendNotificationToUser(userId, {
+      title: "Ticket created",
+      message: "Your support ticket has been created.",
+      type: "ticket.created",
+      ticketId: ticket.ticket_id,
+    });
 
     return res.status(201).json({
       message: "Notification ticket created successfully.",
@@ -108,6 +115,12 @@ const updateTicket = async (req, res) => {
 
     logger.info("ticket.updated", { userId, ticketId });
     const [ticket] = await attachTicketMessages(rows);
+    sendNotificationToUser(userId, {
+      title: "Ticket updated",
+      message: "Your ticket details were updated.",
+      type: "ticket.updated",
+      ticketId,
+    });
     return res.json({ ticket });
   } catch (err) {
     logger.error("ticket.update_failed", err, { userId: getAuthedUserId(req), ticketId: req.params.ticketId });
@@ -171,6 +184,14 @@ const addTicketMessage = async (req, res) => {
       userId,
       ticketId,
       authorRole: isAdmin ? "admin" : "customer",
+    });
+    sendNotificationToUser(ticket.user_id, {
+      title: isAdmin ? "Admin replied" : "Message added",
+      message: isAdmin
+        ? "Admin replied to your ticket."
+        : "Your message was added to the ticket.",
+      type: "ticket.message_added",
+      ticketId,
     });
     return res.status(201).json({ ticket: ticketWithMessages });
   } catch (err) {

@@ -1,5 +1,6 @@
 const pool = require("../../config/db");
 const logger = require("../../util/logger");
+const { sendNotificationToUser } = require("../../services/notificationEvents");
 const {
   getAuthedUserId,
   ensureOwnUser,
@@ -164,6 +165,13 @@ const bookAppointment = async (req, res) => {
       appointmentDate: appointment.appointment_date,
       appointmentTime: appointment.appointment_time,
     });
+    sendNotificationToUser(userId, {
+      title: "Appointment booked",
+      message: "Your appointment request has been received.",
+      type: "appointment.booked",
+      ticketId: notification.ticket_id,
+      bookingId: appointment.booking_id,
+    });
 
     return res.status(201).json({
       message: "Appointment booked successfully.",
@@ -300,6 +308,13 @@ const updateAppointment = async (req, res) => {
     }
 
     logger.info("appointments.updated", { userId, bookingId });
+    sendNotificationToUser(userId, {
+      title: "Appointment updated",
+      message: "Your appointment update has been received.",
+      type: "appointment.updated",
+      ticketId: appointment.notification_ticket_id,
+      bookingId,
+    });
     return res.json({ appointment: mapAppointment(appointment) });
   } catch (err) {
     logger.error("appointments.update_failed", err, { userId: getAuthedUserId(req), bookingId: req.params.bookingId });
@@ -468,6 +483,13 @@ const rescheduleAppointment = async (req, res) => {
       ticketId: result.notification.ticket_id,
       appointmentDate: result.appointment.appointment_date,
       appointmentTime: result.appointment.appointment_time,
+    });
+    sendNotificationToUser(userId, {
+      title: "Appointment rescheduled",
+      message: "Your reschedule request has been received.",
+      type: "appointment.rescheduled",
+      ticketId: result.notification.ticket_id,
+      bookingId,
     });
 
     return res.status(200).json({
