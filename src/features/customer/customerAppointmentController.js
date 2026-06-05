@@ -70,21 +70,27 @@ const bookAppointment = async (req, res) => {
     } = req.body;
     const userId = getAuthedUserId(req);
     const photoUrls = Array.isArray(req.body?.photo_urls)
-      ? req.body.photo_urls.filter(Boolean).slice(0, 5)
+      ? req.body.photo_urls.filter(Boolean)
       : [];
     const trimmedAddress = String(appointmentAddress || address || "").trim();
+
+    if (photoUrls.length > 5) {
+      logger.warn("appointments.book_rejected", { userId, reason: "too_many_photos" });
+      return res.status(400).json({ message: "You can upload up to 5 photos." });
+    }
 
     if (
       !appointmentType ||
       !subject ||
       !category ||
       !preferredDate ||
-      !preferredTime
+      !preferredTime ||
+      !trimmedAddress
     ) {
       logger.warn("appointments.book_rejected", { userId, reason: "missing_required_fields" });
-      return res
-        .status(400)
-        .json({ message: "Appointment details are required." });
+      return res.status(400).json({
+        message: "Appointment type, subject, category, date, time, and address are required.",
+      });
     }
 
     const { appointment, notification } = await pool.withTransaction(async (client) => {
@@ -160,22 +166,28 @@ const updateAppointment = async (req, res) => {
     } = req.body;
     const userId = getAuthedUserId(req);
     const photoUrls = Array.isArray(photoUrlsInput)
-      ? photoUrlsInput.filter(Boolean).slice(0, 5)
+      ? photoUrlsInput.filter(Boolean)
       : null;
     const nextAddress =
       typeof appointmentAddress === "string"
         ? appointmentAddress.trim()
         : typeof address === "string"
-          ? address.trim()
+        ? address.trim()
           : undefined;
+
+    if (photoUrls && photoUrls.length > 5) {
+      logger.warn("appointments.update_rejected", { userId, bookingId, reason: "too_many_photos" });
+      return res.status(400).json({ message: "You can upload up to 5 photos." });
+    }
 
     if (
       (appointmentType !== undefined && !appointmentType?.trim()) ||
       (subject !== undefined && !subject?.trim()) ||
-      (category !== undefined && !category?.trim())
+      (category !== undefined && !category?.trim()) ||
+      (nextAddress !== undefined && !nextAddress)
     ) {
       logger.warn("appointments.update_rejected", { userId, bookingId, reason: "empty_required_field" });
-      return res.status(400).json({ message: "Appointment details cannot be empty." });
+      return res.status(400).json({ message: "Appointment details and address cannot be empty." });
     }
 
     const appointment = await pool.withTransaction(async (client) => {
@@ -274,14 +286,19 @@ const rescheduleAppointment = async (req, res) => {
     } = req.body;
     const userId = getAuthedUserId(req);
     const photoUrls = Array.isArray(req.body?.photo_urls)
-      ? req.body.photo_urls.filter(Boolean).slice(0, 5)
+      ? req.body.photo_urls.filter(Boolean)
       : null;
     const nextAddress =
       typeof appointmentAddress === "string"
         ? appointmentAddress.trim()
         : typeof address === "string"
-          ? address.trim()
+        ? address.trim()
           : undefined;
+
+    if (photoUrls && photoUrls.length > 5) {
+      logger.warn("appointments.reschedule_rejected", { userId, bookingId, reason: "too_many_photos" });
+      return res.status(400).json({ message: "You can upload up to 5 photos." });
+    }
 
     if (!preferredDate || !preferredTime) {
       logger.warn("appointments.reschedule_rejected", { userId, bookingId, reason: "missing_date_or_time" });
@@ -320,6 +337,10 @@ const rescheduleAppointment = async (req, res) => {
       const nextQuery = query.trim() || current.query || "";
       const finalAddress =
         nextAddress !== undefined ? nextAddress : current.appointment_address || "";
+
+      if (!finalAddress.trim()) {
+        return { status: "missing_address" };
+      }
 
       const notification = await createNotificationTicket(client, {
         userId,
@@ -384,6 +405,15 @@ const rescheduleAppointment = async (req, res) => {
       return res.status(400).json({
         message: "Rescheduling is only available while the appointment is pending.",
       });
+    }
+
+    if (result.status === "missing_address") {
+      logger.warn("appointments.reschedule_rejected", {
+        userId,
+        bookingId,
+        reason: "missing_address",
+      });
+      return res.status(400).json({ message: "Appointment address is required." });
     }
 
     logger.info("appointments.rescheduled", {
