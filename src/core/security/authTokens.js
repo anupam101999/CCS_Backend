@@ -136,6 +136,7 @@ async function refreshAuthSession(refreshToken) {
      WHERE s.session_id = $1
        AND s.user_id = $2
        AND s.refresh_token_hash = $3
+       AND u.access_disabled = FALSE
        AND s.last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($4 || ' days')::INTERVAL
      LIMIT 1`,
     [payload.sid, payload.sub, hashToken(refreshToken), SESSION_INACTIVITY_DAYS],

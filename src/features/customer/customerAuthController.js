@@ -156,7 +156,7 @@ const verifyRegistrationEmail = async (req, res) => {
     const { rows: inserted } = await client.query(
       `INSERT INTO users (full_name, email, phone, dob, address, password, avatarurl)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, full_name, email, phone, dob, address, is_superadmin, is_admin, is_manager, avatarurl`,
+       RETURNING id, full_name, email, phone, dob, address, is_superadmin, is_admin, is_manager, access_disabled, avatarurl`,
       [
         pending.full_name,
         pending.email,
@@ -215,7 +215,7 @@ const login = async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT id, full_name, email, phone, dob, address, password, is_superadmin, is_admin, is_manager, avatarurl
+      `SELECT id, full_name, email, phone, dob, address, password, is_superadmin, is_admin, is_manager, access_disabled, avatarurl
        FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
       [normalizedEmail],
     );
@@ -225,6 +225,10 @@ const login = async (req, res) => {
     if (!user) {
       logger.warn("auth.login_failed", { reason: "invalid_credentials" });
       return res.status(401).json({ message: "Invalid email or password." });
+    }
+    if (user.access_disabled === true) {
+      logger.warn("auth.login_failed", { reason: "access_disabled", userId: user.id });
+      return res.status(403).json({ message: "Your account access is disabled. Please contact support." });
     }
     const passwordMatches = await verifyPassword(password, user.password);
     if (!passwordMatches) {

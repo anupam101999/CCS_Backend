@@ -157,18 +157,10 @@ const updateTicket = async (req, res) => {
 
 const addTicketMessage = async (req, res) => {
   try {
-    if (req.user?.is_manager) {
-      logger.warn("ticket.message_add_denied", {
-        requesterId: req.user.id,
-        ticketId: req.params.ticketId,
-        reason: "manager_read_only",
-      });
-      return res.status(403).json({
-        code: "MANAGER_READ_ONLY",
-        message: "Manager access is read-only.",
-      });
-    }
-    const isAdmin = req.user?.is_superadmin === true || req.user?.is_admin === true;
+    const isStaff =
+      req.user?.is_superadmin === true ||
+      req.user?.is_admin === true ||
+      req.user?.is_manager === true;
     const userId = req.user?.id;
     const { ticketId } = req.params;
     const messageBody = String(req.body?.message || "").trim();
@@ -183,11 +175,11 @@ const addTicketMessage = async (req, res) => {
     const ticket = await pool.withTransaction(async (client) => {
       const current = await findTicketForMessage(client, {
         ticketId,
-        isAdmin,
+        isAdmin: isStaff,
         userId,
       });
       if (!current) return null;
-      if (!isAdmin && String(current.status).toLowerCase() !== "in-progress") {
+      if (!isStaff && String(current.status).toLowerCase() !== "in-progress") {
         const err = new Error("New messages can only be added while the ticket is in progress.");
         err.code = "TICKET_CHAT_CLOSED";
         throw err;
@@ -196,7 +188,7 @@ const addTicketMessage = async (req, res) => {
       await insertTicketMessage(client, {
         ticketId,
         userId,
-        authorRole: isAdmin ? "admin" : "customer",
+        authorRole: isStaff ? (req.user?.is_manager ? "manager" : "admin") : "customer",
         messageBody,
       });
       return makeTicketVisibleInUpdates(client, ticketId);
@@ -210,9 +202,9 @@ const addTicketMessage = async (req, res) => {
     logger.info("ticket.message_added", {
       userId,
       ticketId,
-      authorRole: isAdmin ? "admin" : "customer",
+      authorRole: isStaff ? (req.user?.is_manager ? "manager" : "admin") : "customer",
     });
-    if (isAdmin) {
+    if (isStaff) {
       sendNotificationToUser(ticket.user_id, {
         title: "Team replied",
         message: `TCK${ticketId} - ${ticket.subject}`,

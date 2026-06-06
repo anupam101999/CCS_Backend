@@ -36,6 +36,7 @@ async function authenticateStream(req, res, next) {
        WHERE s.session_id = $1
          AND s.user_id = $2
          AND u.id = s.user_id
+         AND u.access_disabled = FALSE
          AND s.last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($3 || ' days')::INTERVAL
        RETURNING s.user_id, u.email, u.is_superadmin, u.is_admin, u.is_manager`,
       [payload.sid, payload.sub, SESSION_INACTIVITY_DAYS],

@@ -23,6 +23,7 @@ async function dbCreateQuery() {
         is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
         is_admin BOOLEAN NOT NULL DEFAULT FALSE,
         is_manager BOOLEAN NOT NULL DEFAULT FALSE,
+        access_disabled BOOLEAN NOT NULL DEFAULT FALSE,
         password VARCHAR(255) NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
         updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
@@ -132,6 +133,37 @@ async function dbCreateQuery() {
     await client.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS is_manager BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS access_disabled BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS role_feature_access (
+        role_name VARCHAR(20) NOT NULL,
+        feature_key VARCHAR(40) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        PRIMARY KEY (role_name, feature_key),
+        CONSTRAINT role_feature_access_role_check
+          CHECK (role_name IN ('manager', 'admin', 'superadmin')),
+        CONSTRAINT role_feature_access_feature_check
+          CHECK (feature_key IN ('dashboard', 'customer_switch', 'appointments', 'tickets', 'projects', 'logs'))
+      );
+    `);
+
+    await client.query(`
+      INSERT INTO role_feature_access (role_name, feature_key, enabled)
+      SELECT role_name, feature_key, TRUE
+      FROM (
+        VALUES ('manager'), ('admin'), ('superadmin')
+      ) AS roles(role_name)
+      CROSS JOIN (
+        VALUES ('dashboard'), ('customer_switch'), ('appointments'), ('tickets'), ('projects'), ('logs')
+      ) AS features(feature_key)
+      ON CONFLICT (role_name, feature_key) DO NOTHING;
     `);
 
     await client.query(`

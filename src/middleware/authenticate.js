@@ -41,6 +41,7 @@ async function authenticate(req, res, next) {
          AND s.user_id = $2
          AND u.id = s.user_id
          AND s.last_active_at > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($3 || ' days')::INTERVAL
+         AND u.access_disabled = FALSE
        RETURNING s.session_id, s.user_id, u.email, u.is_superadmin, u.is_admin, u.is_manager`,
       [payload.sid, payload.sub, SESSION_INACTIVITY_DAYS],
     );

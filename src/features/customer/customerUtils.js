@@ -91,6 +91,7 @@ function mapUser(user) {
     is_superadmin: isSuperadmin,
     is_admin: isAdmin,
     is_manager: !isSuperadmin && !isAdmin && user.is_manager === true,
+    access_disabled: user.access_disabled === true,
     avatarurl: user.avatarurl || "",
   };
 }

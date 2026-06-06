@@ -5,6 +5,7 @@ function requireSession(req, res, next) {
   return authenticate(req, res, () => {
     if (
       req.user.is_manager &&
+      req.headers["x-view-as-user-id"] &&
       !["GET", "HEAD", "OPTIONS"].includes(req.method)
     ) {
       logger.warn("auth.manager_readonly_denied", {

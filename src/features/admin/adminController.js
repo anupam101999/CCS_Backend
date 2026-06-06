@@ -214,7 +214,7 @@ const getAllUsers = async (req, res) => {
     const search = `%${q}%`;
     const { rows } = await pool.query(
       `SELECT id, full_name, email, phone, dob, address, avatarurl,
-              is_superadmin, is_admin, is_manager
+              is_superadmin, is_admin, is_manager, access_disabled
        FROM users
        WHERE ${req.user?.is_superadmin ? "TRUE" : "is_superadmin = FALSE AND is_admin = FALSE AND is_manager = FALSE"}
          AND (
@@ -545,7 +545,7 @@ const updateUserRole = async (req, res) => {
            updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
        WHERE id = $4
        RETURNING id, full_name, email, phone, dob, address, avatarurl,
-                 is_superadmin, is_admin, is_manager`,
+                 is_superadmin, is_admin, is_manager, access_disabled`,
       [
         nextRole === "superadmin",
         nextRole === "admin",
@@ -569,6 +569,112 @@ const updateUserRole = async (req, res) => {
       adminId: req.adminId,
       targetUserId: req.params.userId,
     });
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const updateUserAccess = async (req, res) => {
+  try {
+    if (!req.user?.is_superadmin) {
+      return res.status(403).json({
+        code: "SUPERADMIN_REQUIRED",
+        message: "Only superadmin can change account access.",
+      });
+    }
+
+    const accessDisabled = req.body?.access_disabled === true;
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET access_disabled = $1,
+           updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')
+       WHERE id = $2
+       RETURNING id, full_name, email, phone, dob, address, avatarurl,
+                 is_superadmin, is_admin, is_manager, access_disabled`,
+      [accessDisabled, req.params.userId],
+    );
+
+    if (!rows[0]) return res.status(404).json({ message: "User not found." });
+
+    if (accessDisabled) {
+      await pool.query(`DELETE FROM auth_sessions WHERE user_id = $1`, [
+        req.params.userId,
+      ]);
+    }
+
+    logger.info("admin.user_access_updated", {
+      adminId: req.adminId,
+      targetUserId: req.params.userId,
+      accessDisabled,
+    });
+    return res.json({ user: rows[0] });
+  } catch (err) {
+    logger.error("admin.user_access_update_failed", err, {
+      adminId: req.adminId,
+      targetUserId: req.params.userId,
+    });
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const getFeatureAccess = async (req, res) => {
+  try {
+    const role = req.user?.is_superadmin
+      ? ""
+      : req.user?.is_admin
+        ? "admin"
+        : "manager";
+    const { rows } = await pool.query(
+      `SELECT role_name, feature_key, enabled
+       FROM role_feature_access
+       ${role ? "WHERE role_name = $1" : ""}
+       ORDER BY role_name, feature_key`,
+      role ? [role] : [],
+    );
+    return res.json({ features: rows });
+  } catch (err) {
+    logger.error("admin.feature_access_list_failed", err, { adminId: req.adminId });
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const updateFeatureAccess = async (req, res) => {
+  try {
+    if (!req.user?.is_superadmin) {
+      return res.status(403).json({
+        code: "SUPERADMIN_REQUIRED",
+        message: "Only superadmin can update feature access.",
+      });
+    }
+
+    const role = String(req.params.role || "").trim().toLowerCase();
+    const feature = String(req.params.feature || "").trim().toLowerCase();
+    const validRoles = ["manager", "admin", "superadmin"];
+    const validFeatures = ["dashboard", "customer_switch", "appointments", "tickets", "projects", "logs"];
+
+    if (!validRoles.includes(role) || !validFeatures.includes(feature)) {
+      return res.status(400).json({ message: "Invalid role or feature." });
+    }
+
+    const enabled = req.body?.enabled === true;
+    const { rows } = await pool.query(
+      `INSERT INTO role_feature_access (role_name, feature_key, enabled, updated_at)
+       VALUES ($1, $2, $3, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))
+       ON CONFLICT (role_name, feature_key)
+       DO UPDATE SET enabled = EXCLUDED.enabled,
+                     updated_at = EXCLUDED.updated_at
+       RETURNING role_name, feature_key, enabled`,
+      [role, feature, enabled],
+    );
+
+    logger.info("admin.feature_access_updated", {
+      adminId: req.adminId,
+      role,
+      feature,
+      enabled,
+    });
+    return res.json({ feature: rows[0] });
+  } catch (err) {
+    logger.error("admin.feature_access_update_failed", err, { adminId: req.adminId });
     return res.status(500).json({ message: "Internal server error." });
   }
 };
@@ -890,6 +996,9 @@ module.exports = {
   getStats,
   getAllUsers,
   updateUserRole,
+  updateUserAccess,
+  getFeatureAccess,
+  updateFeatureAccess,
   getAllAppointments,
   updateAppointment,
   updateAppointmentStatus,
