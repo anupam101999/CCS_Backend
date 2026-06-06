@@ -9,6 +9,8 @@ const {
 const { requireSession } = require("../../middleware/requireSession");
 const { requireFeatureAccess } = require("../../middleware/requireFeatureAccess");
 
-router.get("/projects/:userId", requireSession, requireFeatureAccess("projects"), getProjectsByUserId);
+const requireProjects = requireFeatureAccess("projects");
+
+router.get("/projects/:userId", requireSession, requireProjects, getProjectsByUserId);
 
 module.exports = router;

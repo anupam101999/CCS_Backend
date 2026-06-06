@@ -1,6 +1,6 @@
 const logger = require("../util/logger");
 const { authenticate } = require("./authenticate");
-const { isFeatureEnabledForUser, roleFor } = require("../core/security/featureAccess");
+const { requireFeatureAccess } = require("./requireFeatureAccess");
 
 function featureForPath(req) {
   const path = String(req.originalUrl || "").split("?")[0].replace(/\/+$/, "");
@@ -14,7 +14,7 @@ function featureForPath(req) {
 }
 
 function requireAdmin(req, res, next) {
-  return authenticate(req, res, async () => {
+  return authenticate(req, res, () => {
     if (!req.user.is_superadmin && !req.user.is_admin && !req.user.is_manager) {
       logger.warn("auth.admin_access_denied", {
         method: req.method,
@@ -27,32 +27,7 @@ function requireAdmin(req, res, next) {
     req.adminId = req.user.id;
     const feature = featureForPath(req);
     if (!feature) return next();
-
-    try {
-      const enabled = await isFeatureEnabledForUser(req.user, feature);
-      if (!enabled) {
-        logger.warn("auth.feature_access_denied", {
-          userId: req.user.id,
-          role: roleFor(req.user),
-          feature,
-          path: req.originalUrl,
-        });
-        return res.status(403).json({
-          code: "FEATURE_ACCESS_DENIED",
-          message: "This feature is not enabled for your role.",
-        });
-      }
-      return next();
-    } catch (err) {
-      logger.error("auth.feature_access_check_failed", err, {
-        userId: req.user.id,
-        feature,
-      });
-      return res.status(503).json({
-        code: "FEATURE_ACCESS_UNAVAILABLE",
-        message: "Feature access check is temporarily unavailable.",
-      });
-    }
+    return requireFeatureAccess(feature)(req, res, next);
   });
 }
 

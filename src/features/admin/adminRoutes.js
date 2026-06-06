@@ -18,7 +18,7 @@ const {
 const {
   deleteTicketPhoto,
   deleteAppointmentPhoto,
-} = require("../customer/customerController");
+} = require("../customer/customerSupportController");
 
 adminRoutes.get("/stats",                          requireAdmin, getStats);
 adminRoutes.get("/users",                          requireAdmin, getAllUsers);

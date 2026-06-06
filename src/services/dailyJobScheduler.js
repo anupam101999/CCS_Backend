@@ -1,6 +1,6 @@
 const logger = require("../util/logger");
 const { recordBatchJob } = require("../util/batchJobRuns");
-const { getTimeZone, localTimestamp, nextDailyRunTimestamp } = require("../util/time");
+const { getTimeZone, nextDailyRunTimestamp } = require("../util/time");
 const { main: runAvatarCleanup } = require("../../scheduled-jobs/avatar-cleanup/cleanupAvatarUrls");
 const { main: runDbMaintenance } = require("../../scheduled-jobs/db-maintenance/cleanupExpiredData");
 
@@ -22,7 +22,6 @@ function startDailyJobScheduler() {
 
   async function runJobs() {
     if (running) {
-      console.log("Daily jobs: previous run still active, skipping this trigger");
       logger.warn("daily_jobs.skipped_overlap");
       await recordBatchJob({
         jobName: "daily_jobs",
@@ -37,7 +36,6 @@ function startDailyJobScheduler() {
     }
 
     running = true;
-    console.log(`Daily jobs: started at ${localTimestamp()}`);
     logger.info("daily_jobs.started", { taskTime, timeZone });
 
     try {
@@ -56,7 +54,6 @@ function startDailyJobScheduler() {
           runSource: "daily_scheduler",
         });
 
-        console.log(`Daily jobs: completed at ${localTimestamp()}`);
         logger.info("daily_jobs.completed", { taskTime, timeZone });
         return {
           status: "success",
@@ -69,7 +66,6 @@ function startDailyJobScheduler() {
         };
       });
     } catch (err) {
-      console.error(`Daily jobs: failed - ${err?.message || err}`);
       logger.error("daily_jobs.failed", err, { taskTime, timeZone });
     } finally {
       running = false;
@@ -80,7 +76,6 @@ function startDailyJobScheduler() {
     const nextRun = nextDailyRunTimestamp(taskTime, timeZone);
     const delay = Math.min(millisecondsUntil(nextRun), MAX_TIMEOUT_MS);
 
-    console.log(`Daily jobs: next run at ${nextRun}`);
     logger.info("daily_jobs.scheduled", { taskTime, timeZone, nextRun });
 
     setTimeout(async () => {

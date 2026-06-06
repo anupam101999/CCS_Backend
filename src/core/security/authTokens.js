@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../../config/db");
+const { roleFor } = require("./featureAccess");
 
 const ACCESS_TOKEN_MINUTES = Math.min(
   Math.max(Number(process.env.JWT_ACCESS_TOKEN_MINUTES) || 15, 5),
@@ -28,13 +29,6 @@ function refreshSecret() {
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function roleFor(user) {
-  if (user.is_superadmin === true) return "superadmin";
-  if (user.is_admin === true) return "admin";
-  if (user.is_manager === true) return "manager";
-  return "customer";
 }
 
 function signAccessToken(user, sessionId) {

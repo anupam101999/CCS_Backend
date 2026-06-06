@@ -70,7 +70,9 @@ app.use("/api", customerRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api", projectRoutes);
 app.use("/api", notificationRoutes);
-app.use("/api/debug", requireAdmin, require("../services/mailerTest").router);
+if (process.env.NODE_ENV !== "production") {
+  app.use("/api/debug", requireAdmin, require("../services/mailerTest").router);
+}
 
 app.get("/", (_req, res) =>
   res.json({ status: "online", app: "CCS Backend", version: "3.1.0" }),

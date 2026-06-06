@@ -15,18 +15,21 @@ const { requireAdmin } = require("../../middleware/requireAdmin");
 const { requireFeatureAccess } = require("../../middleware/requireFeatureAccess");
 const { publicUploadLimiter } = require("../../middleware/authRateLimits");
 
+const requireTickets = requireFeatureAccess("tickets");
+const requireAppointments = requireFeatureAccess("appointments");
+
 router.post("/upload", requireSession, upload.single("file"), uploadFile);
 router.post(
   "/upload/ticket-photos",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   upload.array("files", 5),
   uploadTicketPhotos,
 );
 router.post(
   "/upload/appointment-photos",
   requireSession,
-  requireFeatureAccess("appointments"),
+  requireAppointments,
   upload.array("files", 5),
   uploadTicketPhotos,
 );

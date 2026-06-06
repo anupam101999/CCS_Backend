@@ -3,16 +3,20 @@ const {
   register,
   verifyRegistrationEmail,
   login,
+  signOut,
+  tokenRefresh,
+  requestPasswordReset,
+  resetPassword,
+} = require("./customerAuthController");
+const {
   requestEmailChange,
   verifyEmailChange,
   update,
+} = require("./customerProfileController");
+const {
   supportTicket,
   updateTicket,
   addTicketMessage,
-  listAppointments,
-  bookAppointment,
-  updateAppointment,
-  rescheduleAppointment,
   getMyTickets,
   getHomeNotifications,
   markNotificationRead,
@@ -22,12 +26,14 @@ const {
   clearNotifications,
   deleteTicketPhoto,
   deleteAppointmentPhoto,
+} = require("./customerSupportController");
+const {
+  listAppointments,
+  bookAppointment,
+  updateAppointment,
+  rescheduleAppointment,
   confirmedAppointments,
-  signOut,
-  tokenRefresh,
-  requestPasswordReset,
-  resetPassword,
-} = require("./customerController");
+} = require("./customerAppointmentController");
 const { requireSession } = require("../../middleware/requireSession");
 const { requireFeatureAccess } = require("../../middleware/requireFeatureAccess");
 const { requireTrustedOrigin } = require("../../middleware/requireTrustedOrigin");
@@ -37,6 +43,9 @@ const {
   refreshLimiter,
   verificationLimiter,
 } = require("../../middleware/authRateLimits");
+
+const requireTickets = requireFeatureAccess("tickets");
+const requireAppointments = requireFeatureAccess("appointments");
 
 // Public
 userRoute.post("/register", verificationLimiter, register);
@@ -51,76 +60,76 @@ userRoute.post("/token-refresh", requireTrustedOrigin, refreshLimiter, tokenRefr
 userRoute.put("/update", requireSession, update);
 userRoute.post("/email-change/request", requireSession, requestEmailChange);
 userRoute.post("/email-change/verify", requireSession, verifyEmailChange);
-userRoute.post("/support/ticket", requireSession, requireFeatureAccess("tickets"), supportTicket);
-userRoute.put("/support/tickets/:ticketId", requireSession, requireFeatureAccess("tickets"), updateTicket);
+userRoute.post("/support/ticket", requireSession, requireTickets, supportTicket);
+userRoute.put("/support/tickets/:ticketId", requireSession, requireTickets, updateTicket);
 userRoute.post(
   "/support/tickets/:ticketId/messages",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   addTicketMessage,
 );
 userRoute.delete(
   "/support/tickets/:ticketId/photos",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   deleteTicketPhoto,
 );
 userRoute.delete(
   "/appointments/:bookingId/photos",
   requireSession,
-  requireFeatureAccess("appointments"),
+  requireAppointments,
   deleteAppointmentPhoto,
 );
-userRoute.get("/appointments/:userId", requireSession, requireFeatureAccess("appointments"), listAppointments);
-userRoute.post("/appointments", requireSession, requireFeatureAccess("appointments"), bookAppointment);
-userRoute.put("/appointments/:bookingId", requireSession, requireFeatureAccess("appointments"), updateAppointment);
+userRoute.get("/appointments/:userId", requireSession, requireAppointments, listAppointments);
+userRoute.post("/appointments", requireSession, requireAppointments, bookAppointment);
+userRoute.put("/appointments/:bookingId", requireSession, requireAppointments, updateAppointment);
 userRoute.put(
   "/appointments/:bookingId/reschedule",
   requireSession,
-  requireFeatureAccess("appointments"),
+  requireAppointments,
   rescheduleAppointment,
 );
-userRoute.get("/myNotifications/:userId", requireSession, requireFeatureAccess("tickets"), getMyTickets);
+userRoute.get("/myNotifications/:userId", requireSession, requireTickets, getMyTickets);
 userRoute.get(
   "/myNotifications/:userId/home",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   getHomeNotifications,
 );
 userRoute.put(
   "/myNotifications/:userId/:ticketId/read",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   markNotificationRead,
 );
 userRoute.delete(
   "/myNotifications/:userId/home/:ticketId",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   clearHomeNotification,
 );
 userRoute.delete(
   "/myNotifications/:userId/home",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   clearHomeNotifications,
 );
 userRoute.delete(
   "/myNotifications/:userId/:ticketId",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   deleteNotification,
 );
 userRoute.get(
   "/myConfirmedAppointments/:userId",
   requireSession,
-  requireFeatureAccess("appointments"),
+  requireAppointments,
   confirmedAppointments,
 );
 userRoute.delete(
   "/myNotifications/:userId",
   requireSession,
-  requireFeatureAccess("tickets"),
+  requireTickets,
   clearNotifications,
 );
 

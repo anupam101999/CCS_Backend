@@ -11,9 +11,9 @@ const FEATURE_KEYS = [
 ];
 
 function roleFor(user = {}) {
-  if (user.is_superadmin) return "superadmin";
-  if (user.is_admin) return "admin";
-  if (user.is_manager) return "manager";
+  if (user.is_superadmin === true) return "superadmin";
+  if (user.is_admin === true) return "admin";
+  if (user.is_manager === true) return "manager";
   return "customer";
 }
 
@@ -47,7 +47,6 @@ async function isFeatureEnabledForUser(user, featureKey) {
 
 module.exports = {
   FEATURE_KEYS,
-  STAFF_FEATURES: FEATURE_KEYS,
   isFeatureEnabledForUser,
   roleFor,
 };
