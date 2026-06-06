@@ -5,6 +5,7 @@ const {
   SESSION_INACTIVITY_DAYS,
   verifyAccessToken,
 } = require("../../core/security/authTokens");
+const { isFeatureEnabledForUser } = require("../../core/security/featureAccess");
 const { addNotificationClient } = require("../../services/notificationEvents");
 
 async function authenticateStream(req, res, next) {
@@ -59,6 +60,13 @@ async function authenticateStream(req, res, next) {
       is_admin: isAdmin,
       is_manager: !isSuperadmin && !isAdmin && session.is_manager === true,
     };
+    const streamEnabled = await isFeatureEnabledForUser(req.user, "stream_notifications");
+    if (!streamEnabled) {
+      return res.status(403).json({
+        code: "FEATURE_ACCESS_DENIED",
+        message: "Stream notifications are not enabled for this account.",
+      });
+    }
     return next();
   } catch (err) {
     logger.error("notifications.stream_auth_failed", err);

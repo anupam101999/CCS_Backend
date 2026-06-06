@@ -7,6 +7,7 @@ const {
   updateUserAccess,
   getFeatureAccess,
   updateFeatureAccess,
+  updateUserFeatureAccess,
   getAllAppointments,
   updateAppointment,
   updateAppointmentStatus,
@@ -25,6 +26,7 @@ adminRoutes.put("/users/:userId/role",             requireAdmin, updateUserRole)
 adminRoutes.put("/users/:userId/access",           requireAdmin, updateUserAccess);
 adminRoutes.get("/feature-access",                 requireAdmin, getFeatureAccess);
 adminRoutes.put("/feature-access/:role/:feature",  requireAdmin, updateFeatureAccess);
+adminRoutes.put("/users/:userId/features/:feature", requireAdmin, updateUserFeatureAccess);
 adminRoutes.get("/appointments",                   requireAdmin, getAllAppointments);
 adminRoutes.put("/appointments/:bookingId",        requireAdmin, updateAppointment);
 adminRoutes.put("/appointments/:bookingId/status", requireAdmin, updateAppointmentStatus);

@@ -1,13 +1,6 @@
 const logger = require("../util/logger");
 const { authenticate } = require("./authenticate");
-const pool = require("../config/db");
-
-function roleFor(user) {
-  if (user.is_superadmin) return "superadmin";
-  if (user.is_admin) return "admin";
-  if (user.is_manager) return "manager";
-  return "customer";
-}
+const { isFeatureEnabledForUser, roleFor } = require("../core/security/featureAccess");
 
 function featureForPath(req) {
   const path = String(req.originalUrl || "").split("?")[0].replace(/\/+$/, "");
@@ -36,14 +29,8 @@ function requireAdmin(req, res, next) {
     if (!feature || req.user.is_superadmin) return next();
 
     try {
-      const { rows } = await pool.query(
-        `SELECT enabled
-         FROM role_feature_access
-         WHERE role_name = $1 AND feature_key = $2
-         LIMIT 1`,
-        [roleFor(req.user), feature],
-      );
-      if (rows[0]?.enabled === false) {
+      const enabled = await isFeatureEnabledForUser(req.user, feature);
+      if (!enabled) {
         logger.warn("auth.feature_access_denied", {
           userId: req.user.id,
           role: roleFor(req.user),

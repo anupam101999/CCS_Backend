@@ -48,6 +48,24 @@ async function ensureBatchJobRunsTable() {
     ON batch_job_runs(run_status, started_at DESC);
   `);
 
+  await pool.query(`
+    CREATE SEQUENCE IF NOT EXISTS batch_job_runs_id_seq
+      OWNED BY batch_job_runs.id;
+  `);
+
+  await pool.query(`
+    ALTER TABLE batch_job_runs
+    ALTER COLUMN id SET DEFAULT nextval('batch_job_runs_id_seq');
+  `);
+
+  await pool.query(`
+    SELECT setval(
+      'batch_job_runs_id_seq',
+      GREATEST(COALESCE((SELECT MAX(id) FROM batch_job_runs), 0), 1),
+      COALESCE((SELECT MAX(id) FROM batch_job_runs), 0) > 0
+    );
+  `);
+
   hasEnsuredTable = true;
 }
 

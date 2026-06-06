@@ -13,6 +13,7 @@ const {
   deleteUserSessions,
   refreshAuthSession,
 } = require("../../core/security/authTokens");
+const { sendSessionRevokedToUser } = require("../../services/notificationEvents");
 const {
   PASSWORD_RESET_TOKEN_MINUTES,
   REGISTRATION_VERIFICATION_CODE_MINUTES,
@@ -244,6 +245,9 @@ const login = async (req, res) => {
     }
 
     const auth = await createAuthSession(pool, user);
+    sendSessionRevokedToUser(user.id, {
+      message: "Another device logged in. Please sign in again.",
+    });
 
     logger.info("auth.login_success", {
       userId: user.id,

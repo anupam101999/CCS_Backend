@@ -150,7 +150,20 @@ async function dbCreateQuery() {
         CONSTRAINT role_feature_access_role_check
           CHECK (role_name IN ('manager', 'admin', 'superadmin')),
         CONSTRAINT role_feature_access_feature_check
-          CHECK (feature_key IN ('dashboard', 'customer_switch', 'appointments', 'tickets', 'projects', 'logs'))
+          CHECK (feature_key IN ('dashboard', 'customer_switch', 'appointments', 'tickets', 'projects', 'logs', 'stream_notifications'))
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_feature_access (
+        user_id INTEGER NOT NULL
+          REFERENCES users(id) ON DELETE CASCADE,
+        feature_key VARCHAR(40) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
+        PRIMARY KEY (user_id, feature_key),
+        CONSTRAINT user_feature_access_feature_check
+          CHECK (feature_key IN ('dashboard', 'customer_switch', 'appointments', 'tickets', 'projects', 'logs', 'stream_notifications'))
       );
     `);
 
@@ -161,7 +174,7 @@ async function dbCreateQuery() {
         VALUES ('manager'), ('admin'), ('superadmin')
       ) AS roles(role_name)
       CROSS JOIN (
-        VALUES ('dashboard'), ('customer_switch'), ('appointments'), ('tickets'), ('projects'), ('logs')
+        VALUES ('dashboard'), ('customer_switch'), ('appointments'), ('tickets'), ('projects'), ('logs'), ('stream_notifications')
       ) AS features(feature_key)
       ON CONFLICT (role_name, feature_key) DO NOTHING;
     `);

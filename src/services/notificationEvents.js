@@ -76,6 +76,22 @@ function sendNotificationToUser(userId, payload = {}) {
   return clientCount;
 }
 
+function sendSessionRevokedToUser(userId, payload = {}) {
+  const eventPayload = {
+    message: "Another device logged in. Please sign in again.",
+    ...payload,
+  };
+  const clientCount = sendToUser(userId, "session.revoked", eventPayload);
+
+  logger.info("notifications.session_revoked_sent", {
+    userId,
+    clientCount,
+    deliveredLive: clientCount > 0,
+  });
+
+  return clientCount;
+}
+
 async function sendNotificationToStaff(payload = {}) {
   try {
     const { rows } = await pool.query(
@@ -113,5 +129,6 @@ module.exports = {
   addNotificationClient,
   sendNotificationToStaff,
   sendNotificationToUser,
+  sendSessionRevokedToUser,
   sendToUser,
 };

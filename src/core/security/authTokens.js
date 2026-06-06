@@ -119,11 +119,13 @@ async function createAuthSession(client, user) {
      VALUES ($1, $2, $3)`,
     [sessionId, user.id, hashToken(refreshToken)],
   );
+  await deleteOtherUserSessions(client, user.id, sessionId);
 
   return {
     accessToken: signAccessToken(user, sessionId),
     refreshToken,
     expiresInSeconds: ACCESS_TOKEN_MINUTES * 60,
+    sessionId,
   };
 }
 

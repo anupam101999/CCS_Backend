@@ -7,8 +7,11 @@ const logger = require("../../src/util/logger");
 const { recordBatchJob } = require("../../src/util/batchJobRuns");
 
 const dryRun = String(process.env.DB_MAINTENANCE_DRY_RUN || "").toLowerCase() === "true";
-const inactiveSessionDays = 30;
+const retentionDays = Number(process.env.DB_RETENTION_DAYS || 3);
+const inactiveSessionDays = Number(process.env.AUTH_SESSION_RETENTION_DAYS || retentionDays);
 const appLogRetentionDays = Number(process.env.APP_LOG_RETENTION_DAYS || 3);
+const batchLogRetentionDays = Number(process.env.BATCH_LOG_RETENTION_DAYS || retentionDays);
+const notificationRetentionDays = Number(process.env.NOTIFICATION_RETENTION_DAYS || retentionDays);
 
 const countQueries = {
   expiredPendingRegistrations: `
@@ -29,17 +32,39 @@ const countQueries = {
   inactiveAuthSessions: `
     SELECT COUNT(*)::INT AS count
     FROM auth_sessions
-    WHERE last_active_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '30 days'
+    WHERE last_active_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
   `,
   oldAppLogs: `
     SELECT COUNT(*)::INT AS count
     FROM app_logs
     WHERE created_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
   `,
+  oldBatchJobRuns: `
+    SELECT COUNT(*)::INT AS count
+    FROM batch_job_runs
+    WHERE created_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
+  `,
+  oldResolvedOrClearedNotifications: `
+    SELECT COUNT(*)::INT AS count
+    FROM notification_tickets
+    WHERE updated_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
+      AND (
+        status IN ('resolved', 'closed', 'completed', 'cancelled')
+        OR is_read = TRUE
+        OR home_dismissed_at IS NOT NULL
+        OR updates_cleared_at IS NOT NULL
+      )
+  `,
 };
 
 async function getCount(client, name) {
-  const values = name === "oldAppLogs" ? [appLogRetentionDays] : [];
+  const valuesByName = {
+    inactiveAuthSessions: [inactiveSessionDays],
+    oldAppLogs: [appLogRetentionDays],
+    oldBatchJobRuns: [batchLogRetentionDays],
+    oldResolvedOrClearedNotifications: [notificationRetentionDays],
+  };
+  const values = valuesByName[name] || [];
   const { rows } = await client.query(countQueries[name], values);
 
   return rows[0]?.count || 0;
@@ -74,8 +99,9 @@ async function runCleanup(client) {
   const inactiveAuthSessions = await client.query(
     `
       DELETE FROM auth_sessions
-      WHERE last_active_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - INTERVAL '30 days'
+      WHERE last_active_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
     `,
+    [inactiveSessionDays],
   );
 
   const oldAppLogs = await client.query(
@@ -86,12 +112,36 @@ async function runCleanup(client) {
     [appLogRetentionDays],
   );
 
+  const oldResolvedOrClearedNotifications = await client.query(
+    `
+      DELETE FROM notification_tickets
+      WHERE updated_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
+        AND (
+          status IN ('resolved', 'closed', 'completed', 'cancelled')
+          OR is_read = TRUE
+          OR home_dismissed_at IS NOT NULL
+          OR updates_cleared_at IS NOT NULL
+        )
+    `,
+    [notificationRetentionDays],
+  );
+
+  const oldBatchJobRuns = await client.query(
+    `
+      DELETE FROM batch_job_runs
+      WHERE created_at < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata') - ($1 || ' days')::INTERVAL
+    `,
+    [batchLogRetentionDays],
+  );
+
   return {
     expiredPendingRegistrations: expiredPendingRegistrations.rowCount,
     expiredPendingEmailChanges: expiredPendingEmailChanges.rowCount,
     expiredOrUsedPasswordResetTokens: expiredOrUsedPasswordResetTokens.rowCount,
     inactiveAuthSessions: inactiveAuthSessions.rowCount,
     oldAppLogs: oldAppLogs.rowCount,
+    oldResolvedOrClearedNotifications: oldResolvedOrClearedNotifications.rowCount,
+    oldBatchJobRuns: oldBatchJobRuns.rowCount,
   };
 }
 
@@ -100,7 +150,7 @@ async function main(options = {}) {
   const runSource = options.runSource || "manual";
 
   console.log("DB maintenance: started");
-  console.log(`DB maintenance: dryRun=${dryRun}, inactiveSessionDays=${inactiveSessionDays}, appLogRetentionDays=${appLogRetentionDays}`);
+  console.log(`DB maintenance: dryRun=${dryRun}, inactiveSessionDays=${inactiveSessionDays}, appLogRetentionDays=${appLogRetentionDays}, batchLogRetentionDays=${batchLogRetentionDays}, notificationRetentionDays=${notificationRetentionDays}`);
 
   try {
     const result = await recordBatchJob({
@@ -110,6 +160,8 @@ async function main(options = {}) {
       metadata: {
         inactiveSessionDays,
         appLogRetentionDays,
+        batchLogRetentionDays,
+        notificationRetentionDays,
       },
     }, async () => {
       const counts = await pool.withTransaction(async (client) => {
@@ -126,6 +178,8 @@ async function main(options = {}) {
           counts,
           inactiveSessionDays,
           appLogRetentionDays,
+          batchLogRetentionDays,
+          notificationRetentionDays,
         },
       };
     });
@@ -136,6 +190,8 @@ async function main(options = {}) {
         dryRun,
         inactiveSessionDays,
         appLogRetentionDays,
+        batchLogRetentionDays,
+        notificationRetentionDays,
         ...counts,
       });
 
@@ -148,6 +204,8 @@ async function main(options = {}) {
       dryRun,
       inactiveSessionDays,
       appLogRetentionDays,
+      batchLogRetentionDays,
+      notificationRetentionDays,
       ...counts,
     });
     console.log(`DB maintenance: completed ${JSON.stringify(counts)}`);

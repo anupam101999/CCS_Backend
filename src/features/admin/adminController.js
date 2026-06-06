@@ -3,6 +3,7 @@ const logger = require("../../util/logger");
 const { formatDateOnly } = require("../../util/time");
 const { attachTicketMessages, toJsonb } = require("../customer/customerUtils");
 const { sendNotificationToUser } = require("../../services/notificationEvents");
+const { STAFF_FEATURES } = require("../../core/security/featureAccess");
 
 function formatAppointmentDate(date) {
   if (!date) return "the selected date";
@@ -233,7 +234,24 @@ const getAllUsers = async (req, res) => {
       query: q,
       resultCount: rows.length,
     });
-    return res.json({ users: rows });
+    const users = rows;
+    if (req.user?.is_superadmin && users.length) {
+      const { rows: featureRows } = await pool.query(
+        `SELECT user_id, feature_key, enabled
+         FROM user_feature_access
+         WHERE user_id = ANY($1::INT[])`,
+        [users.map((user) => user.id)],
+      );
+      const featuresByUser = featureRows.reduce((acc, row) => {
+        acc[row.user_id] = acc[row.user_id] || {};
+        acc[row.user_id][row.feature_key] = row.enabled;
+        return acc;
+      }, {});
+      users.forEach((user) => {
+        user.feature_access = featuresByUser[user.id] || {};
+      });
+    }
+    return res.json({ users });
   } catch (err) {
     logger.error("admin.users_search_failed", err, { adminId: req.adminId });
     return res.status(500).json({ message: "Internal server error." });
@@ -649,7 +667,7 @@ const updateFeatureAccess = async (req, res) => {
     const role = String(req.params.role || "").trim().toLowerCase();
     const feature = String(req.params.feature || "").trim().toLowerCase();
     const validRoles = ["manager", "admin", "superadmin"];
-    const validFeatures = ["dashboard", "customer_switch", "appointments", "tickets", "projects", "logs"];
+    const validFeatures = STAFF_FEATURES;
 
     if (!validRoles.includes(role) || !validFeatures.includes(feature)) {
       return res.status(400).json({ message: "Invalid role or feature." });
@@ -675,6 +693,48 @@ const updateFeatureAccess = async (req, res) => {
     return res.json({ feature: rows[0] });
   } catch (err) {
     logger.error("admin.feature_access_update_failed", err, { adminId: req.adminId });
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const updateUserFeatureAccess = async (req, res) => {
+  try {
+    if (!req.user?.is_superadmin) {
+      return res.status(403).json({
+        code: "SUPERADMIN_REQUIRED",
+        message: "Only superadmin can update user feature access.",
+      });
+    }
+
+    const feature = String(req.params.feature || "").trim().toLowerCase();
+    if (!STAFF_FEATURES.includes(feature)) {
+      return res.status(400).json({ message: "Invalid feature." });
+    }
+
+    const enabled = req.body?.enabled === true;
+    const { rows } = await pool.query(
+      `INSERT INTO user_feature_access (user_id, feature_key, enabled, updated_at)
+       VALUES ($1, $2, $3, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'))
+       ON CONFLICT (user_id, feature_key)
+       DO UPDATE SET enabled = EXCLUDED.enabled,
+                     updated_at = EXCLUDED.updated_at
+       RETURNING user_id, feature_key, enabled`,
+      [req.params.userId, feature, enabled],
+    );
+
+    logger.info("admin.user_feature_access_updated", {
+      adminId: req.adminId,
+      targetUserId: req.params.userId,
+      feature,
+      enabled,
+    });
+    return res.json({ feature: rows[0] });
+  } catch (err) {
+    logger.error("admin.user_feature_access_update_failed", err, {
+      adminId: req.adminId,
+      targetUserId: req.params.userId,
+      feature: req.params.feature,
+    });
     return res.status(500).json({ message: "Internal server error." });
   }
 };
@@ -999,6 +1059,7 @@ module.exports = {
   updateUserAccess,
   getFeatureAccess,
   updateFeatureAccess,
+  updateUserFeatureAccess,
   getAllAppointments,
   updateAppointment,
   updateAppointmentStatus,
