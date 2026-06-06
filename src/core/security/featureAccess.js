@@ -1,6 +1,6 @@
 const pool = require("../../config/db");
 
-const STAFF_FEATURES = [
+const FEATURE_KEYS = [
   "dashboard",
   "customer_switch",
   "appointments",
@@ -19,7 +19,6 @@ function roleFor(user = {}) {
 
 async function isFeatureEnabledForUser(user, featureKey) {
   if (!featureKey) return true;
-  if (user?.is_superadmin) return true;
 
   const userId = user?.id || user?.user_id;
   if (userId) {
@@ -34,7 +33,6 @@ async function isFeatureEnabledForUser(user, featureKey) {
   }
 
   const role = roleFor(user);
-  if (!["manager", "admin"].includes(role)) return true;
 
   const { rows } = await pool.query(
     `SELECT enabled
@@ -48,7 +46,8 @@ async function isFeatureEnabledForUser(user, featureKey) {
 }
 
 module.exports = {
-  STAFF_FEATURES,
+  FEATURE_KEYS,
+  STAFF_FEATURES: FEATURE_KEYS,
   isFeatureEnabledForUser,
   roleFor,
 };

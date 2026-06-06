@@ -26,7 +26,7 @@ function requireAdmin(req, res, next) {
 
     req.adminId = req.user.id;
     const feature = featureForPath(req);
-    if (!feature || req.user.is_superadmin) return next();
+    if (!feature) return next();
 
     try {
       const enabled = await isFeatureEnabledForUser(req.user, feature);

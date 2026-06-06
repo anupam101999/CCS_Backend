@@ -12,18 +12,21 @@ const {
 } = require("./uploadController");
 const { requireSession } = require("../../middleware/requireSession");
 const { requireAdmin } = require("../../middleware/requireAdmin");
+const { requireFeatureAccess } = require("../../middleware/requireFeatureAccess");
 const { publicUploadLimiter } = require("../../middleware/authRateLimits");
 
 router.post("/upload", requireSession, upload.single("file"), uploadFile);
 router.post(
   "/upload/ticket-photos",
   requireSession,
+  requireFeatureAccess("tickets"),
   upload.array("files", 5),
   uploadTicketPhotos,
 );
 router.post(
   "/upload/appointment-photos",
   requireSession,
+  requireFeatureAccess("appointments"),
   upload.array("files", 5),
   uploadTicketPhotos,
 );

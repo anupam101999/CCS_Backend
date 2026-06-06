@@ -148,10 +148,21 @@ async function dbCreateQuery() {
         updated_at TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata'),
         PRIMARY KEY (role_name, feature_key),
         CONSTRAINT role_feature_access_role_check
-          CHECK (role_name IN ('manager', 'admin', 'superadmin')),
+          CHECK (role_name IN ('customer', 'manager', 'admin', 'superadmin')),
         CONSTRAINT role_feature_access_feature_check
           CHECK (feature_key IN ('dashboard', 'customer_switch', 'appointments', 'tickets', 'projects', 'logs', 'stream_notifications'))
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE role_feature_access
+      DROP CONSTRAINT IF EXISTS role_feature_access_role_check;
+    `);
+
+    await client.query(`
+      ALTER TABLE role_feature_access
+      ADD CONSTRAINT role_feature_access_role_check
+      CHECK (role_name IN ('customer', 'manager', 'admin', 'superadmin'));
     `);
 
     await client.query(`
@@ -171,7 +182,7 @@ async function dbCreateQuery() {
       INSERT INTO role_feature_access (role_name, feature_key, enabled)
       SELECT role_name, feature_key, TRUE
       FROM (
-        VALUES ('manager'), ('admin'), ('superadmin')
+        VALUES ('customer'), ('manager'), ('admin'), ('superadmin')
       ) AS roles(role_name)
       CROSS JOIN (
         VALUES ('dashboard'), ('customer_switch'), ('appointments'), ('tickets'), ('projects'), ('logs'), ('stream_notifications')

@@ -2,8 +2,11 @@ const pool = require("../../config/db");
 const logger = require("../../util/logger");
 const { formatDateOnly } = require("../../util/time");
 const { attachTicketMessages, toJsonb } = require("../customer/customerUtils");
-const { sendNotificationToUser } = require("../../services/notificationEvents");
-const { STAFF_FEATURES } = require("../../core/security/featureAccess");
+const {
+  sendNotificationToUser,
+  sendSessionRevokedToUser,
+} = require("../../services/notificationEvents");
+const { FEATURE_KEYS } = require("../../core/security/featureAccess");
 
 function formatAppointmentDate(date) {
   if (!date) return "the selected date";
@@ -617,6 +620,9 @@ const updateUserAccess = async (req, res) => {
       await pool.query(`DELETE FROM auth_sessions WHERE user_id = $1`, [
         req.params.userId,
       ]);
+      sendSessionRevokedToUser(req.params.userId, {
+        message: "Your account access was disabled. Please contact support.",
+      });
     }
 
     logger.info("admin.user_access_updated", {
@@ -666,8 +672,8 @@ const updateFeatureAccess = async (req, res) => {
 
     const role = String(req.params.role || "").trim().toLowerCase();
     const feature = String(req.params.feature || "").trim().toLowerCase();
-    const validRoles = ["manager", "admin", "superadmin"];
-    const validFeatures = STAFF_FEATURES;
+    const validRoles = ["customer", "manager", "admin", "superadmin"];
+    const validFeatures = FEATURE_KEYS;
 
     if (!validRoles.includes(role) || !validFeatures.includes(feature)) {
       return res.status(400).json({ message: "Invalid role or feature." });
@@ -707,7 +713,7 @@ const updateUserFeatureAccess = async (req, res) => {
     }
 
     const feature = String(req.params.feature || "").trim().toLowerCase();
-    if (!STAFF_FEATURES.includes(feature)) {
+    if (!FEATURE_KEYS.includes(feature)) {
       return res.status(400).json({ message: "Invalid feature." });
     }
 
